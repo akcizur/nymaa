@@ -13,7 +13,7 @@ var active_touch_id := -1
 var move_vector := Vector2.ZERO
 var action_enabled := false:
 	set(value):
-		action_enabled = value
+		field = value
 		queue_redraw()
 
 func _ready() -> void:
