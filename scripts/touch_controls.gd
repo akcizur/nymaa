@@ -11,6 +11,7 @@ var action_radius := 38.0
 
 var active_touch_id := -1
 var move_vector := Vector2.ZERO
+var action_enabled := false
 
 func _ready() -> void:
 	set_process_input(true)
@@ -39,10 +40,11 @@ func _draw() -> void:
 	draw_circle(joystick_center + move_vector * joystick_radius * 0.64, knob_radius, Color(1, 1, 1, 0.12))
 	draw_arc(joystick_center + move_vector * joystick_radius * 0.64, knob_radius, 0.0, TAU, 48, Color(1, 1, 1, 0.28), 1.0)
 
-	draw_circle(action_center, action_radius, Color(0.03, 0.04, 0.05, 0.55))
-	draw_arc(action_center, action_radius, 0.0, TAU, 48, Color(1, 1, 1, 0.2), 1.2)
+	if action_enabled:
+		draw_circle(action_center, action_radius, Color(0.03, 0.04, 0.05, 0.55))
+		draw_arc(action_center, action_radius, 0.0, TAU, 48, Color(1, 1, 1, 0.2), 1.2)
 
-	var font := ThemeDB.fallback_font
+		var font := ThemeDB.fallback_font
 	draw_string(font, action_center + Vector2(-8, 6), "E", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color.WHITE)
 
 func _input(event: InputEvent) -> void:
@@ -55,7 +57,7 @@ func _input(event: InputEvent) -> void:
 			if touch.position.distance_to(joystick_center) <= joystick_radius * 1.45 and active_touch_id == -1:
 				active_touch_id = touch.index
 				_update_joystick(touch.position)
-			elif touch.position.distance_to(action_center) <= action_radius * 1.5:
+			elif action_enabled and touch.position.distance_to(action_center) <= action_radius * 1.5:
 				action_pressed.emit()
 		elif touch.index == active_touch_id:
 			active_touch_id = -1
