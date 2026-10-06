@@ -168,12 +168,16 @@ func _toggle_vehicle() -> void:
 		driving = true
 		player.visible = false
 		player.input_locked = true
+		player.collision_layer = 0
+		player.collision_mask = 0
 		player.global_position = vehicle.global_position
 		vehicle.controlled = true
 	else:
 		driving = false
 		player.visible = true
 		player.input_locked = false
+		player.collision_layer = 1
+		player.collision_mask = 1
 		vehicle.controlled = false
 
 		var right := Vector3(cos(vehicle.rotation.y), 0, -sin(vehicle.rotation.y))
@@ -232,10 +236,12 @@ func _update_hud() -> void:
 		state_label.text = "MODE        DRIVING"
 		state_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.46))
 		prompt_label.text = "E / TOUCH  •  EXIT CAR"
+		touch_controls.action_enabled = true
 		prompt_label.visible = true
 	else:
 		state_label.text = "MODE        ON FOOT"
 		state_label.add_theme_color_override("font_color", Color(0.82, 0.87, 0.92))
 		var near := player.global_position.distance_to(vehicle.global_position) <= ENTER_RANGE
 		prompt_label.text = "E / TOUCH  •  ENTER CAR" if near else ""
+		touch_controls.action_enabled = near
 		prompt_label.visible = near
