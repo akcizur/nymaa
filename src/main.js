@@ -5,15 +5,15 @@ import './style.css';
 const SAVE_KEY = 'nymaa-post-catastrophe-mvp-v1';
 const WORLD = 100;
 const HALF = WORLD / 2;
-const PLAYER_R = 0.42;
-const INTERACT_R = 3.0;
+const PLAYER_R = 0.11;
+const INTERACT_R = 0.80;
 const GAME_MINUTES_PER_SECOND = 2.5;
 const MAX_INVENTORY = 14;
-const PLAYER_HEIGHT = 1.85;
-const WALK_SPEED = 4.2;
-const RUN_SPEED = 7.2;
-const WALK_ANIM_SPEED = 4.2;
-const RUN_ANIM_SPEED = 7.2;
+const PLAYER_HEIGHT = 0.48;
+const WALK_SPEED = 1.08;
+const RUN_SPEED = 1.85;
+const WALK_ANIM_SPEED = 1.08;
+const RUN_ANIM_SPEED = 1.85;
 
 const ITEM = {
   water: { label: 'WATER', weight: 1 },
@@ -213,7 +213,7 @@ function playPlayerAnimation(name, movementSpeed = 0, fade = 0.16) {
 
   const timeScale = clipName === 'Idle'
     ? 1
-    : THREE.MathUtils.clamp(movementSpeed / referenceSpeed, 0.72, 1.35);
+    : THREE.MathUtils.clamp(movementSpeed / referenceSpeed, 0.80, 1.20);
 
   wanted.setEffectiveTimeScale(timeScale);
   wanted.setEffectiveWeight(1);
@@ -835,7 +835,7 @@ function updatePlayer(dt) {
     return;
   }
 
-  // Camera-relative world direction.
+  // Camera-relative world direction in the map's normalized scale.
   const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
   const rx = -fz, rz = fx;
   const wx = input.z * fx + input.x * rx;
@@ -857,7 +857,7 @@ function updatePlayer(dt) {
     Math.sin(targetYaw - player.rotation.y),
     Math.cos(targetYaw - player.rotation.y)
   );
-  player.rotation.y += delta * (1 - Math.exp(-16 * dt));
+  player.rotation.y += delta * (1 - Math.exp(-11 * dt));
 
   playPlayerAnimation(running ? 'Run' : 'Walk', speed);
 }
