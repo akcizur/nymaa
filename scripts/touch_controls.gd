@@ -11,7 +11,10 @@ var action_radius := 38.0
 
 var active_touch_id := -1
 var move_vector := Vector2.ZERO
-var action_enabled := false
+var action_enabled := false:
+	set(value):
+		action_enabled = value
+		queue_redraw()
 
 func _ready() -> void:
 	set_process_input(true)
