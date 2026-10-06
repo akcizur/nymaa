@@ -7,18 +7,16 @@ function realScaleWorld() {
     transform(code, id) {
       if (!id.endsWith('/src/main.js')) return null;
 
-      // The imported human is visually too large against the original blockout.
-      // Keep the gameplay collision radius intact while fitting the visible model
-      // to a slightly smaller human reference and increasing the placeholder
-      // architecture to believable proportions.
-      let next = code.replace(
-        'const PLAYER_HEIGHT = 1.80;',
-        'const PLAYER_HEIGHT = 1.65;'
-      );
+      let next = code
+        .replace('const PLAYER_HEIGHT = 1.80;', 'const PLAYER_HEIGHT = 1.72;')
+        .replace('const WALK_SPEED = 5.00;', 'const WALK_SPEED = 1.60;')
+        .replace('const RUN_SPEED = 7.20;', 'const RUN_SPEED = 4.80;')
+        .replace('const WALK_ANIM_SPEED = 5.00;', 'const WALK_ANIM_SPEED = 1.60;')
+        .replace('const RUN_ANIM_SPEED = 7.20;', 'const RUN_ANIM_SPEED = 4.80;');
 
       next = next.replace(
         /const BUILDINGS = \[(.*?)\n\];/s,
-        (match, entries) => `const BUILDINGS = [${entries}\n].map(([x, z, w, h, d, color]) => [x, z, w * 1.35, h * 1.50, d * 1.35, color]);`
+        (match, entries) => `const BUILDINGS = [${entries}\n].map(([x, z, w, h, d, color]) => [x, z, w * 2.0, h * 1.65, d * 2.0, color]);`
       );
 
       return { code: next, map: null };
