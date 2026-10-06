@@ -153,7 +153,8 @@ scene.add(baseFloor);
 
 const baseWallMat = mat(0x3d473f);
 for (const [w, d, x, z, y] of [
-  [18, 0.5, 0, -44, 1.25], [18, 0.5, 0, -34, 1.25],
+  [18, 0.5, 0, -44, 1.25],
+  [6.0, 0.5, -6, -34, 1.25], [6.0, 0.5, 6, -34, 1.25],
   [0.5, 10, -9, -39, 1.25], [0.5, 10, 9, -39, 1.25],
 ]) {
   const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 2.5, d), baseWallMat);
@@ -429,18 +430,23 @@ function action() {
 }
 
 function useItem(item) {
+  let changed = false;
   if (item === 'food' && consumeInventory('food')) {
     state.hunger = Math.min(100, state.hunger + 34);
     message('FOOD consumed.');
+    changed = true;
   } else if (item === 'water' && consumeInventory('water')) {
     state.thirst = Math.min(100, state.thirst + 44);
     message('WATER consumed.');
+    changed = true;
   } else if (item === 'medicine' && consumeInventory('medicine')) {
     state.health = Math.min(100, state.health + 35);
     message('MEDICINE used.');
+    changed = true;
   } else {
     message('Nedostatek zásoby.');
   }
+  if (changed) saveGame(false);
   renderUI();
 }
 
