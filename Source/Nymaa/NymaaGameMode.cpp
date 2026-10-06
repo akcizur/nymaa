@@ -7,7 +7,6 @@
 #include "Engine/StaticMeshActor.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "UObject/ConstructorHelpers.h"
 #include "Kismet/GameplayStatics.h"
 
 namespace NymaaBlockout
@@ -144,13 +143,11 @@ AActor* ANymaaGameMode::SpawnBlock(
         return Actor;
     }
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(
-        TEXT("/Engine/BasicShapes/Cube.Cube")
-    );
-
-    if (CubeMesh.Succeeded())
+    if (UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(
+        nullptr,
+        TEXT("/Engine/BasicShapes/Cube.Cube")))
     {
-        Mesh->SetStaticMesh(CubeMesh.Object);
+        Mesh->SetStaticMesh(CubeMesh);
     }
 
     Mesh->SetWorldScale3D(Size / FVector(100.0f, 100.0f, 100.0f));
