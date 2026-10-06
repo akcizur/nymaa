@@ -3,17 +3,17 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import './style.css';
 
 const SAVE_KEY = 'nymaa-post-catastrophe-mvp-v1';
-const WORLD = 100;
+const WORLD = 40;
 const HALF = WORLD / 2;
-const PLAYER_R = 0.11;
-const INTERACT_R = 0.80;
+const PLAYER_R = 0.30;
+const INTERACT_R = 1.35;
 const GAME_MINUTES_PER_SECOND = 2.5;
 const MAX_INVENTORY = 14;
-const PLAYER_HEIGHT = 0.48;
+const PLAYER_HEIGHT = 1.80;
 const WALK_SPEED = 5.00;
-const RUN_SPEED = 10.40;
+const RUN_SPEED = 7.20;
 const WALK_ANIM_SPEED = 5.00;
-const RUN_ANIM_SPEED = 10.40;
+const RUN_ANIM_SPEED = 7.20;
 
 const ITEM = {
   water: { label: 'WATER', weight: 1 },
@@ -34,32 +34,32 @@ const RECIPES = [
 ];
 
 const BUILDINGS = [
-  [-10, -7, 11, 8, 10, 0x7d8585],
-  [9, -8, 10, 6, 9, 0x9a8b68],
-  [-12, 8, 10, 5, 9, 0x8b6f62],
-  [12, 8, 11, 9, 10, 0x7d8585],
+  [-3.6, -2.2, 2.8, 2.4, 2.6, 0x7d8585],
+  [3.0, -2.6, 2.8, 1.8, 2.3, 0x9a8b68],
+  [-3.4, 3.2, 2.6, 1.7, 2.4, 0x8b6f62],
+  [3.5, 3.1, 2.9, 2.4, 2.6, 0x7d8585],
 
-  [-39, -35, 8, 4, 8, 0x8b6f62],
-  [35, -35, 10, 5, 8, 0x9a8b68],
-  [-39, 35, 9, 8, 9, 0x7d8585],
-  [-8, 35, 13, 12, 13, 0x707878],
-  [10, 35, 11, 5, 9, 0x9a8b68],
-  [36, 35, 8, 4, 8, 0x8b6f62],
+  [-15.0, -14.0, 2.2, 1.8, 2.2, 0x8b6f62],
+  [14.5, -14.0, 2.8, 2.2, 2.2, 0x9a8b68],
+  [-14.8, 14.3, 2.5, 3.2, 2.4, 0x7d8585],
+  [-3.2, 14.0, 3.2, 4.0, 3.0, 0x707878],
+  [3.5, 14.0, 2.8, 2.1, 2.3, 0x9a8b68],
+  [14.5, 14.2, 2.3, 1.8, 2.2, 0x8b6f62],
 
-  [-38, 0, 8, 4, 8, 0x8b6f62],
-  [38, 0, 11, 10, 10, 0x7d8585],
-  [-36, -4, 7, 4, 7, 0x796b5f],
-  [34, 10, 7, 4, 7, 0x796b5f],
+  [-14.5, 0, 2.3, 1.8, 2.2, 0x8b6f62],
+  [14.8, 0, 2.8, 3.5, 2.6, 0x7d8585],
+  [-13.7, -1.6, 2.0, 1.6, 2.0, 0x796b5f],
+  [13.5, 4.0, 2.0, 1.6, 2.0, 0x796b5f],
 ];
 
 const LOOT_SEEDS = [
-  { id: 'crate-a', x: -31, z: -30, label: 'ABANDONED CACHE', items: { water: 2, food: 1, scrap: 2 } },
-  { id: 'crate-b', x: -31, z: -11, label: 'KITCHEN', items: { food: 2, medicine: 1, dirtyWater: 2 } },
-  { id: 'crate-c', x: 24, z: -12, label: 'WORKSHOP', items: { scrap: 5, wood: 2 } , requires: 'tool' },
-  { id: 'crate-d', x: 28, z: 28, label: 'FOREST EDGE', items: { wood: 6 }, requires: 'axe' },
-  { id: 'crate-e', x: -27, z: 29, label: 'CLINIC', items: { medicine: 2, water: 2, food: 1 } },
-  { id: 'crate-f', x: 33, z: -35, label: 'GARAGE', items: { scrap: 6, wood: 2 }, requires: 'tool' },
-  { id: 'crate-g', x: -7, z: 23, label: 'DRAINAGE', items: { dirtyWater: 5, scrap: 1 } },
+  { id: 'crate-a', x: -12, z: -12, label: 'ABANDONED CACHE', items: { water: 2, food: 1, scrap: 2 } },
+  { id: 'crate-b', x: -12, z: -5.5, label: 'KITCHEN', items: { food: 2, medicine: 1, dirtyWater: 2 } },
+  { id: 'crate-c', x: 10, z: -5.5, label: 'WORKSHOP', items: { scrap: 5, wood: 2 } , requires: 'tool' },
+  { id: 'crate-d', x: 11, z: 11, label: 'FOREST EDGE', items: { wood: 6 }, requires: 'axe' },
+  { id: 'crate-e', x: -10, z: 11, label: 'CLINIC', items: { medicine: 2, water: 2, food: 1 } },
+  { id: 'crate-f', x: 13, z: -13, label: 'GARAGE', items: { scrap: 6, wood: 2 }, requires: 'tool' },
+  { id: 'crate-g', x: -3, z: 9, label: 'DRAINAGE', items: { dirtyWater: 5, scrap: 1 } },
 ];
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -105,8 +105,8 @@ const grid = new THREE.GridHelper(WORLD, 50, 0x54594f, 0x54594f);
 grid.position.y = 0.005;
 scene.add(grid);
 
-const ROAD_WIDTH = 9;
-const SIDEWALK_WIDTH = 1.5;
+const ROAD_WIDTH = 5;
+const SIDEWALK_WIDTH = 1.2;
 const CURB_H = 0.12;
 
 const roadMat = new THREE.MeshLambertMaterial({ color: 0x454545 });
@@ -161,11 +161,11 @@ function addStreetStrip(axis, fixed, length = WORLD) {
 }
 
 function addStreetDashes(axis, fixed) {
-  const gap = 10;
+  const gap = 6;
   const dashLength = 4;
-  for (let v = -46; v <= 46; v += gap) {
+  for (let v = -18; v <= 18; v += gap) {
     // Keep junction centers visually open.
-    if ([-25, 25].some((junction) => Math.abs(v - junction) < 7)) continue;
+    if ([-10, 10].some((junction) => Math.abs(v - junction) < 4)) continue;
 
     const dash = new THREE.Mesh(
       axis === 'x' ? new THREE.PlaneGeometry(dashLength, 0.22) : new THREE.PlaneGeometry(0.22, dashLength),
@@ -195,18 +195,18 @@ function addCrosswalk(x, z, horizontal = true) {
   }
 }
 
-addStreetStrip('x', -20);
-addStreetStrip('x', 20);
-addStreetStrip('z', -25);
-addStreetStrip('z', 25);
+addStreetStrip('x', -5.5);
+addStreetStrip('x', 5.5);
+addStreetStrip('z', -10);
+addStreetStrip('z', 10);
 
-addStreetDashes('x', -20);
-addStreetDashes('x', 20);
-addStreetDashes('z', -25);
-addStreetDashes('z', 25);
+addStreetDashes('x', -5.5);
+addStreetDashes('x', 5.5);
+addStreetDashes('z', -10);
+addStreetDashes('z', 10);
 
-for (const x of [-25, 25]) {
-  for (const z of [-20, 20]) {
+for (const x of [-10, 10]) {
+  for (const z of [-5.5, 5.5]) {
     addCrosswalk(x, z, true);
     addCrosswalk(x, z, false);
   }
@@ -263,8 +263,8 @@ for (const [x, z, w, h, d, color] of BUILDINGS) {
   });
 }
 
-const baseCenter = new THREE.Vector3(0, 0, -39);
-const baseSize = { x: 18, z: 10 };
+const baseCenter = new THREE.Vector3(0, 0, -17);
+const baseSize = { x: 7, z: 4.5 };
 const baseFloor = new THREE.Mesh(
   new THREE.BoxGeometry(baseSize.x, 0.25, baseSize.z),
   new THREE.MeshLambertMaterial({ color: 0x707870 })
@@ -275,20 +275,20 @@ scene.add(baseFloor);
 
 const baseWallMat = mat(0x7c817c);
 for (const [w, d, x, z, y] of [
-  [18, 0.5, 0, -44, 1.25],
-  [6.0, 0.5, -6, -34, 1.25], [6.0, 0.5, 6, -34, 1.25],
-  [0.5, 10, -9, -39, 1.25], [0.5, 10, 9, -39, 1.25],
+  [7, 0.35, 0, -19.25, 0.9],
+  [2.2, 0.35, -2.4, -14.75, 0.9], [2.2, 0.35, 2.4, -14.75, 0.9],
+  [0.35, 4.5, -3.5, -17, 0.9], [0.35, 4.5, 3.5, -17, 0.9],
 ]) {
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 2.5, d), baseWallMat);
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 1.8, d), baseWallMat);
   wall.position.set(x, y, z);
   wall.castShadow = wall.receiveShadow = true;
   scene.add(wall);
 }
 const baseMarker = new THREE.Mesh(
-  new THREE.CylinderGeometry(4.2, 4.2, 0.12, 32),
+  new THREE.CylinderGeometry(1.5, 1.5, 0.08, 24),
   new THREE.MeshBasicMaterial({ color: 0x008080, transparent: true, opacity: 0.25 })
 );
-baseMarker.position.set(baseCenter.x, 0.08, baseCenter.z);
+baseMarker.position.set(baseCenter.x, 0.05, baseCenter.z);
 scene.add(baseMarker);
 
 const edgeMat = mat(0x55595a);
@@ -312,7 +312,7 @@ for (const [w, d, x, z] of [
 
 // Player — animated rigged GLB
 const player = new THREE.Group();
-player.position.set(0, 0, -39);
+player.position.set(0, 0, -17);
 player.castShadow = true;
 player.rotation.y = Math.PI;
 scene.add(player);
@@ -329,7 +329,7 @@ let playerOneShotUntil = 0;
 let playerDeadUntil = 0;
 
 const playerShadow = new THREE.Mesh(
-  new THREE.CircleGeometry(0.17, 20),
+  new THREE.CircleGeometry(0.34, 20),
   new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false })
 );
 playerShadow.rotation.x = -Math.PI / 2;
@@ -472,10 +472,10 @@ for (const seed of LOOT_SEEDS) {
 // Base build objects
 const buildObjects = new Map();
 const BUILD_POS = {
-  campfire: new THREE.Vector3(-5.2, 0, -39),
-  storageBox: new THREE.Vector3(-1.7, 0, -40.8),
-  bed: new THREE.Vector3(3.4, 0, -40.2),
-  waterFilter: new THREE.Vector3(5.2, 0, -36.7),
+  campfire: new THREE.Vector3(-2.0, 0, -17),
+  storageBox: new THREE.Vector3(-0.6, 0, -17.7),
+  bed: new THREE.Vector3(1.4, 0, -17.4),
+  waterFilter: new THREE.Vector3(2.0, 0, -15.9),
 };
 function rebuildBaseVisuals(buildings) {
   for (const g of buildObjects.values()) scene.remove(g);
@@ -523,7 +523,7 @@ const defaultState = () => ({
   health: 100,
   hunger: 100,
   thirst: 100,
-  player: { x: 0, z: -39, rot: Math.PI },
+  player: { x: 0, z: -17, rot: Math.PI },
   inventory: { water: 2, food: 1, medicine: 1, wood: 0, scrap: 0, dirtyWater: 0 },
   storage: { water: 6, food: 4, medicine: 2, wood: 8, scrap: 6, dirtyWater: 0 },
   tools: { axe: false, tool: false },
@@ -725,7 +725,7 @@ function consumeInventory(key, amount = 1) {
 }
 
 function nearBase() {
-  return Math.hypot(player.position.x - baseCenter.x, player.position.z - baseCenter.z) <= 6.2;
+  return Math.hypot(player.position.x - baseCenter.x, player.position.z - baseCenter.z) <= 2.8;
 }
 function nearestLoot() {
   let best = null, dist = Infinity;
@@ -1059,7 +1059,7 @@ function updateHint() {
   hint.classList.toggle('hidden', !text);
 }
 
-const focus = new THREE.Vector3(0, 0, -39);
+const focus = new THREE.Vector3(0, 0, -17);
 let camYaw = Math.PI;
 let camPitch = 0.95;
 let flashClock = 0;
@@ -1166,7 +1166,7 @@ function updateSurvival(dt) {
     message('YOU COLLAPSED — respawn at base.', 3500);
     playerDeadUntil = performance.now() + 1100;
     playPlayerOneShot('Death', 1.0, 0.05);
-    player.position.set(0,0,-39);
+    player.position.set(0,0,-17);
     state.health = 55;
     state.hunger = 35;
     state.thirst = 45;
