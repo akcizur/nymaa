@@ -193,19 +193,7 @@ let playerAction = '';
 let playerModel = null;
 let playerLoaded = false;
 
-const PLAYER_MODEL_URL = `${import.meta.env.BASE_URL}assets/player/demo-avatar.glb.b64`;
-
-function decodeBase64(base64) {
-  const clean = base64.replace(/\s/g, '');
-  const binary = atob(clean);
-  const bytes = new Uint8Array(binary.length);
-  const chunk = 0x8000;
-  for (let i = 0; i < binary.length; i += chunk) {
-    const end = Math.min(i + chunk, binary.length);
-    for (let j = i; j < end; j++) bytes[j] = binary.charCodeAt(j);
-  }
-  return bytes.buffer;
-}
+const PLAYER_MODEL_URL = `${import.meta.env.BASE_URL}assets/player/demo-avatar.glb`;
 
 function playPlayerAnimation(name, fade = 0.16) {
   if (!playerMixer || !playerActions.size) return;
@@ -218,14 +206,9 @@ function playPlayerAnimation(name, fade = 0.16) {
 }
 
 async function loadPlayerModel() {
-  const response = await fetch(PLAYER_MODEL_URL);
-  if (!response.ok) throw new Error(`Player model HTTP ${response.status}`);
-  const base64 = await response.text();
-  const buffer = decodeBase64(base64);
-
   const loader = new GLTFLoader();
   await new Promise((resolve, reject) => {
-    loader.parse(buffer, PLAYER_MODEL_URL, (gltf) => {
+    loader.load(PLAYER_MODEL_URL, (gltf) => {
       const root = gltf.scene;
 
       root.traverse((object) => {
