@@ -510,18 +510,25 @@ function filterStoredWater() {
 }
 
 function rest() {
-  if (!nearBase() || !state.buildings.bed) {
-    message('Pro spánek potřebuješ BED na základně.');
+  if (!nearBase()) {
+    message('Musíš být na základně.');
     return;
   }
-  const now = state.time;
-  let nextMorning = 6 * 60;
-  if (now >= nextMorning) nextMorning += 24 * 60;
-  state.time = nextMorning;
-  state.health = 100;
-  state.hunger = Math.max(0, state.hunger - 12);
-  state.thirst = Math.max(0, state.thirst - 18);
-  message('SLEEP — nový den. Zkontroluj FOOD/WATER.');
+  if (state.buildings.bed) {
+    const now = state.time;
+    let nextMorning = 6 * 60;
+    if (now >= nextMorning) nextMorning += 24 * 60;
+    state.time = nextMorning;
+    state.health = 100;
+    state.hunger = Math.max(0, state.hunger - 12);
+    state.thirst = Math.max(0, state.thirst - 18);
+    message('SLEEP — nový den. Zkontroluj FOOD/WATER.');
+  } else if (state.buildings.campfire) {
+    state.health = Math.min(100, state.health + 10);
+    message('CAMPFIRE REST — HEALTH +10.');
+  } else {
+    message('Postav CAMPFIRE nebo BED.');
+  }
   saveGame(false);
   renderUI();
 }
