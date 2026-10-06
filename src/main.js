@@ -65,6 +65,9 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.toneMappingExposure = 1;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -189,6 +192,7 @@ for (const [w, d, x, z] of [
 // Player — animated rigged GLB
 const player = new THREE.Group();
 player.position.set(0, 0, -39);
+player.castShadow = true;
 player.rotation.y = Math.PI;
 scene.add(player);
 
@@ -197,13 +201,30 @@ let playerActions = new Map();
 let playerAction = '';
 let playerModel = null;
 let playerLoaded = false;
+let playerLocomotion = 'Idle';
+let playerOneShot = false;
+let playerOneShotAction = null;
+let playerOneShotUntil = 0;
+let playerDeadUntil = 0;
+
+const playerShadow = new THREE.Mesh(
+  new THREE.CircleGeometry(0.17, 20),
+  new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false })
+);
+playerShadow.rotation.x = -Math.PI / 2;
+playerShadow.position.y = 0.008;
+scene.add(playerShadow);
 
 const PLAYER_MODEL_URL = `${import.meta.env.BASE_URL}assets/player/demo-avatar.glb`;
 
-function playPlayerAnimation(name, movementSpeed = 0, fade = 0.16) {
+function playPlayerAnimation(name, movementSpeed = 0, fade = 0.14) {
   if (!playerMixer || !playerActions.size) return;
 
   const clipName = playerActions.has(name) ? name : 'Idle';
+  playerLocomotion = clipName;
+
+  if (playerOneShot) return;
+
   const wanted = playerActions.get(clipName);
   if (!wanted) return;
 
@@ -213,8 +234,11 @@ function playPlayerAnimation(name, movementSpeed = 0, fade = 0.16) {
 
   const timeScale = clipName === 'Idle'
     ? 1
-    : THREE.MathUtils.clamp(movementSpeed / referenceSpeed, 0.80, 1.20);
+    : THREE.MathUtils.clamp(movementSpeed / referenceSpeed, 0.88, 1.12);
 
+  wanted.enabled = true;
+  wanted.setLoop(THREE.LoopRepeat, Infinity);
+  wanted.clampWhenFinished = false;
   wanted.setEffectiveTimeScale(timeScale);
   wanted.setEffectiveWeight(1);
 
@@ -222,8 +246,31 @@ function playPlayerAnimation(name, movementSpeed = 0, fade = 0.16) {
 
   const previous = playerActions.get(playerAction);
   wanted.reset().fadeIn(fade).play();
-  if (previous) previous.fadeOut(fade);
+  if (previous && previous !== wanted) previous.fadeOut(fade);
   playerAction = clipName;
+}
+
+function playPlayerOneShot(name, timeScale = 1, fade = 0.10) {
+  if (!playerMixer || !playerActions.size || !playerActions.has(name) || playerOneShot) return false;
+
+  const wanted = playerActions.get(name);
+  const previous = playerActions.get(playerAction);
+
+  playerOneShot = true;
+  playerOneShotAction = wanted;
+  playerOneShotUntil = performance.now() + 1600;
+
+  wanted.reset();
+  wanted.enabled = true;
+  wanted.setLoop(THREE.LoopOnce, 1);
+  wanted.clampWhenFinished = true;
+  wanted.setEffectiveTimeScale(timeScale);
+  wanted.setEffectiveWeight(1);
+  wanted.fadeIn(fade).play();
+
+  if (previous && previous !== wanted) previous.fadeOut(fade);
+  playerAction = name;
+  return true;
 }
 
 async function loadPlayerModel() {
@@ -263,6 +310,13 @@ async function loadPlayerModel() {
       playerActions = new Map(
         gltf.animations.map((clip) => [clip.name, playerMixer.clipAction(clip)])
       );
+      playerMixer.addEventListener('finished', (event) => {
+        if (event.action !== playerOneShotAction) return;
+        playerOneShot = false;
+        playerOneShotAction = null;
+        playerOneShotUntil = 0;
+        playPlayerAnimation(playerLocomotion, 0);
+      });
 
       playPlayerAnimation('Idle', 0);
       playerLoaded = true;
@@ -366,6 +420,9 @@ let actionQueued = false;
 const onKey = (e, down) => {
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
   if (down && e.repeat) return;
+  if (down && e.code === 'Space') playPlayerOneShot('Jump', 1.0);
+  if (down && e.code === 'KeyF') playPlayerOneShot('Punch', 1.05);
+  if (down && e.code === 'KeyT') playPlayerOneShot('Working', 1.0);
   if (down && e.code === 'KeyE') actionQueued = true;
   if (down && e.code === 'KeyI') togglePanel('inventory');
   if (down && e.code === 'KeyC' && nearBase()) togglePanel('craft');
@@ -479,6 +536,7 @@ function action() {
       message('BACKPACK FULL — vrať se na základnu.');
       return;
     }
+    playPlayerOneShot('Working', 1.05, 0.08);
     addInventory(seed.items);
     state.loot[seed.id] = false;
     lootObjects.get(seed.id).visible = false;
@@ -828,6 +886,21 @@ function clampWorld() {
 }
 
 function updatePlayer(dt) {
+  playerShadow.position.x = player.position.x;
+  playerShadow.position.z = player.position.z;
+
+  if (playerDeadUntil > performance.now()) {
+    playPlayerAnimation('Death');
+    return;
+  }
+
+  if (playerOneShot && performance.now() > playerOneShotUntil) {
+    playerOneShot = false;
+    playerOneShotAction = null;
+    playerOneShotUntil = 0;
+    playPlayerAnimation(playerLocomotion, 0);
+  }
+
   const input = getInput();
 
   if (!input.mag) {
@@ -868,6 +941,8 @@ function updateSurvival(dt) {
   if (state.hunger <= 8 || state.thirst <= 8) state.health = Math.max(0, state.health - dt * 0.42);
   if (state.health <= 0) {
     message('YOU COLLAPSED — respawn at base.', 3500);
+    playerDeadUntil = performance.now() + 1100;
+    playPlayerOneShot('Death', 1.0, 0.05);
     player.position.set(0,0,-39);
     state.health = 55;
     state.hunger = 35;
