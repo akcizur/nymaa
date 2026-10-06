@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import './style.css';
 
 const SAVE_KEY = 'nymaa-post-catastrophe-mvp-v1';
@@ -180,18 +181,97 @@ for (const [w, d, x, z] of [
   colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
 }
 
-// Player
+// Player — animated rigged GLB
 const player = new THREE.Group();
-const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.72, 6, 12), mat(0x496e57));
-body.position.y = 0.72; body.castShadow = true;
-const head = new THREE.Mesh(new THREE.SphereGeometry(0.30, 16, 12), mat(0xd0aa88));
-head.position.y = 1.52; head.castShadow = true;
-const face = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.24), mat(0x202a27));
-face.position.set(0, 1.52, 0.30);
-player.add(body, head, face);
 player.position.set(0, 0, -39);
 player.rotation.y = Math.PI;
 scene.add(player);
+
+let playerMixer = null;
+let playerActions = new Map();
+let playerAction = '';
+let playerModel = null;
+let playerLoaded = false;
+
+const PLAYER_MODEL_URL = `${import.meta.env.BASE_URL}assets/player/demo-avatar.glb.b64`;
+
+function decodeBase64(base64) {
+  const clean = base64.replace(/\\s/g, '');
+  const binary = atob(clean);
+  const bytes = new Uint8Array(binary.length);
+  const chunk = 0x8000;
+  for (let i = 0; i < binary.length; i += chunk) {
+    const end = Math.min(i + chunk, binary.length);
+    for (let j = i; j < end; j++) bytes[j] = binary.charCodeAt(j);
+  }
+  return bytes.buffer;
+}
+
+function playPlayerAnimation(name, fade = 0.16) {
+  if (!playerMixer || !playerActions.size) return;
+  const wanted = playerActions.get(name) || playerActions.get('Idle');
+  if (!wanted || playerAction === name) return;
+  const previous = playerActions.get(playerAction);
+  wanted.reset().fadeIn(fade).play();
+  if (previous) previous.fadeOut(fade);
+  playerAction = name;
+}
+
+async function loadPlayerModel() {
+  const response = await fetch(PLAYER_MODEL_URL);
+  if (!response.ok) throw new Error(`Player model HTTP ${response.status}`);
+  const base64 = await response.text();
+  const buffer = decodeBase64(base64);
+
+  const loader = new GLTFLoader();
+  await new Promise((resolve, reject) => {
+    loader.parse(buffer, PLAYER_MODEL_URL, (gltf) => {
+      const root = gltf.scene;
+
+      root.traverse((object) => {
+        if (object.isMesh) {
+          object.castShadow = true;
+          object.receiveShadow = true;
+          if (object.material) {
+            const materials = Array.isArray(object.material) ? object.material : [object.material];
+            for (const material of materials) {
+              material.metalness = Math.min(material.metalness ?? 0, 0.15);
+              material.roughness = Math.max(material.roughness ?? 0.55, 0.55);
+            }
+          }
+        }
+      });
+
+      const bounds = new THREE.Box3().setFromObject(root);
+      const size = bounds.getSize(new THREE.Vector3());
+      if (size.y > 0.001) root.scale.setScalar(1.85 / size.y);
+
+      const fittedBounds = new THREE.Box3().setFromObject(root);
+      root.position.y -= fittedBounds.min.y;
+
+      player.add(root);
+      playerModel = root;
+
+      playerMixer = new THREE.AnimationMixer(root);
+      playerActions = new Map(
+        gltf.animations.map((clip) => [clip.name, playerMixer.clipAction(clip)])
+      );
+
+      // Quaternius glTF characters are authored for a +Z gameplay forward axis.
+      root.rotation.y = 0;
+
+      playPlayerAnimation('Idle', 0);
+      playerLoaded = true;
+      document.getElementById('load')?.remove();
+      resolve();
+    }, reject);
+  });
+}
+
+loadPlayerModel().catch((error) => {
+  console.error('PLAYER MODEL', error);
+  document.getElementById('load').textContent = 'PLAYER MODEL ERROR';
+});
 
 // Loot
 const lootObjects = new Map();
@@ -709,6 +789,10 @@ function getInput() {
   const d = Math.hypot(x, z);
   return d > 1 ? { x: x / d, z: z / d, mag: 1 } : { x, z, mag: d };
 }
+
+function isRunning() {
+  return keys.has('ShiftLeft') || keys.has('ShiftRight');
+}
 function pushOut(p, r) {
   for (let pass = 0; pass < 2; pass++) {
     let hit = false;
@@ -741,19 +825,30 @@ function clampWorld() {
 
 function updatePlayer(dt) {
   const input = getInput();
-  if (!input.mag) return;
+  if (!input.mag) {
+    playPlayerAnimation('Idle');
+    return;
+  }
+
   const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
   const rx = -fz, rz = fx;
   const wx = input.z * fx + input.x * rx;
   const wz = input.z * fz + input.x * rz;
-  const speed = 6.2;
+
+  const survivalPenalty = Math.min(state.hunger, state.thirst) < 30 ? 0.78 : 1;
+  const running = isRunning();
+  const speed = (running ? 9.0 : 6.2) * survivalPenalty;
+
   player.position.x += wx * speed * dt;
   player.position.z += wz * speed * dt;
   pushOut(player.position, PLAYER_R);
   clampWorld();
+
   const target = Math.atan2(wx, wz);
   const delta = Math.atan2(Math.sin(target - player.rotation.y), Math.cos(target - player.rotation.y));
   player.rotation.y += delta * (1 - Math.exp(-13 * dt));
+
+  playPlayerAnimation(running ? 'Run' : 'Walk');
 }
 
 function updateSurvival(dt) {
@@ -828,6 +923,7 @@ function loop() {
   updatePlayer(dt);
   updateSurvival(dt);
   updateLighting();
+  if (playerMixer) playerMixer.update(dt);
   updateCamera(dt);
   updateHint();
   closePanelsWhenFar();
