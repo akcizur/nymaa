@@ -885,19 +885,11 @@ function updateLighting() {
 }
 
 function updateCamera(dt, snap = false) {
-  // Camera heading follows the character, not raw input.
-  // This prevents D/A from continuously rotating the camera underneath the player.
-  const desiredYaw = player.rotation.y;
-  let d = Math.atan2(Math.sin(desiredYaw - camYaw), Math.cos(desiredYaw - camYaw));
-  camYaw += d * (snap ? 1 : 1 - Math.exp(-5.2 * dt));
-
-  const k = snap ? 1 : 1 - Math.exp(-7 * dt);
-  const lookAhead = 1.8;
-  const aheadX = Math.sin(player.rotation.y) * lookAhead;
-  const aheadZ = Math.cos(player.rotation.y) * lookAhead;
-
-  focus.x += (player.position.x + aheadX - focus.x) * k;
-  focus.z += (player.position.z + aheadZ - focus.z) * k;
+  // Camera heading is a stable control reference.
+  // It follows the player position only; it never redefines WASD mid-move.
+  const k = snap ? 1 : 1 - Math.exp(-8 * dt);
+  focus.x += (player.position.x - focus.x) * k;
+  focus.z += (player.position.z - focus.z) * k;
 
   const dist = 12.5;
   const height = 18.5;
@@ -907,7 +899,7 @@ function updateCamera(dt, snap = false) {
     focus.z - Math.cos(camYaw) * dist
   );
 
-  camera.position.lerp(desired, snap ? 1 : 1 - Math.exp(-7 * dt));
+  camera.position.lerp(desired, snap ? 1 : 1 - Math.exp(-8 * dt));
   if (camera.position.y < 6) camera.position.y = 6;
   camera.lookAt(focus.x, 0.9, focus.z);
 }
