@@ -58,10 +58,24 @@
 
   <section id="message" class="message"></section>
 
-  <div id="touch" class="touch hidden">
-    <div id="stick"><span></span></div>
-    <button id="touch-interact">E</button>
-    <button id="touch-inventory">I</button>
+  <div id="touch" class="touch hidden" aria-hidden="true">
+    <div id="touch-left-zone" class="touch-zone touch-zone--left"></div>
+    <div id="touch-right-zone" class="touch-zone touch-zone--right"></div>
+
+    <div id="touch-left-stick" class="touch-stick touch-stick--left hidden">
+      <span></span>
+    </div>
+    <div id="touch-right-stick" class="touch-stick touch-stick--right hidden">
+      <span></span>
+    </div>
+
+    <div class="touch-actions" aria-label="Touch controls">
+      <button id="touch-jump" class="touch-action touch-action--jump">J</button>
+      <button id="touch-interact" class="touch-action touch-action--interact">A</button>
+      <button id="touch-punch" class="touch-action touch-action--punch">F</button>
+      <button id="touch-run" class="touch-action touch-action--run">R</button>
+      <button id="touch-inventory" class="touch-action touch-action--utility">I</button>
+    </div>
   </div>
 
   <div id="controls" class="controls">
