@@ -7,17 +7,22 @@ function realScaleWorld() {
     transform(code, id) {
       if (!id.endsWith('/src/main.js')) return null;
 
-      let next = code
-        .replace('const PLAYER_HEIGHT = 1.80;', 'const PLAYER_HEIGHT = 1.72;')
-        .replace('const WALK_SPEED = 5.00;', 'const WALK_SPEED = 1.60;')
-        .replace('const RUN_SPEED = 7.20;', 'const RUN_SPEED = 4.80;')
-        .replace('const WALK_ANIM_SPEED = 5.00;', 'const WALK_ANIM_SPEED = 1.60;')
-        .replace('const RUN_ANIM_SPEED = 7.20;', 'const RUN_ANIM_SPEED = 4.80;');
+      // Keep the character at human scale. The previous visual problem was
+      // primarily the camera being too close, which made a correctly sized
+      // human fill most of the mobile viewport.
+      let next = code.replace(
+        'const PLAYER_HEIGHT = 1.80;',
+        'const PLAYER_HEIGHT = 1.65;'
+      );
 
       next = next.replace(
         /const BUILDINGS = \[(.*?)\n\];/s,
-        (match, entries) => `const BUILDINGS = [${entries}\n].map(([x, z, w, h, d, color]) => [x, z, w * 2.0, h * 1.65, d * 2.0, color]);`
+        (match, entries) => `const BUILDINGS = [${entries}\n].map(([x, z, w, h, d, color]) => [x, z, w * 1.35, h * 1.50, d * 1.35, color]);`
       );
+
+      // Mobile third-person framing: move the camera back so the player has
+      // believable scale relative to streets and buildings.
+      next = next.replace('const dist = 13.0;', 'const dist = 23.0;');
 
       return { code: next, map: null };
     },
