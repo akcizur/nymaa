@@ -850,8 +850,9 @@ function updatePlayer(dt) {
   pushOut(player.position, PLAYER_R);
   clampWorld();
 
-  // Character forward = actual travel direction. No extra model rotation.
-  const targetYaw = Math.atan2(wx, wz);
+  // Keep gameplay movement orientation on the default controller axis.
+  // The model's visual yaw offset is handled independently.
+  const targetYaw = Math.atan2(wx, wz) - (Math.PI / 2);
   const delta = Math.atan2(
     Math.sin(targetYaw - player.rotation.y),
     Math.cos(targetYaw - player.rotation.y)
