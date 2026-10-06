@@ -10,9 +10,9 @@ const INTERACT_R = 0.80;
 const GAME_MINUTES_PER_SECOND = 2.5;
 const MAX_INVENTORY = 14;
 const PLAYER_HEIGHT = 0.48;
-const WALK_SPEED = 5.40;
+const WALK_SPEED = 5.00;
 const RUN_SPEED = 10.40;
-const WALK_ANIM_SPEED = 5.40;
+const WALK_ANIM_SPEED = 5.00;
 const RUN_ANIM_SPEED = 10.40;
 
 const ITEM = {
