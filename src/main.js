@@ -232,6 +232,9 @@ async function loadPlayerModel() {
     loader.load(PLAYER_MODEL_URL, (gltf) => {
       const root = gltf.scene;
 
+      // Visual correction: rotate the character 90° left around Y.
+      root.rotation.y = Math.PI / 2;
+
       root.traverse((object) => {
         if (object.isMesh) {
           object.castShadow = true;
