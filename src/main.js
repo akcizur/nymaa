@@ -196,7 +196,7 @@ let playerLoaded = false;
 const PLAYER_MODEL_URL = `${import.meta.env.BASE_URL}assets/player/demo-avatar.glb.b64`;
 
 function decodeBase64(base64) {
-  const clean = base64.replace(/\\s/g, '');
+  const clean = base64.replace(/\s/g, '');
   const binary = atob(clean);
   const bytes = new Uint8Array(binary.length);
   const chunk = 0x8000;
