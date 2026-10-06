@@ -236,14 +236,13 @@ func _update_hud() -> void:
 		state_label.text = "MODE        DRIVING"
 		state_label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.46))
 		prompt_label.text = "E / TOUCH  •  EXIT CAR"
-		touch_controls.action_enabled = true
-		touch_controls.queue_redraw()
+		touch_controls.set_action_enabled(true)
 		prompt_label.visible = true
 	else:
 		state_label.text = "MODE        ON FOOT"
 		state_label.add_theme_color_override("font_color", Color(0.82, 0.87, 0.92))
 		var near := player.global_position.distance_to(vehicle.global_position) <= ENTER_RANGE
 		prompt_label.text = "E / TOUCH  •  ENTER CAR" if near else ""
-		touch_controls.action_enabled = near
+		touch_controls.set_action_enabled(near)
 		touch_controls.queue_redraw()
 		prompt_label.visible = near
