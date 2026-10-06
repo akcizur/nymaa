@@ -34,19 +34,19 @@ const RECIPES = [
 ];
 
 const BUILDINGS = [
-  [-10, -7, 12, 10, 12, 0x6d7887],
-  [9, -8, 12, 6, 9, 0xb28b47],
-  [-12, 8, 11, 5, 10, 0x9d6a4f],
+  [-10, -7, 12, 10, 12, 0x7d8585],
+  [9, -8, 12, 6, 9, 0x9a8b68],
+  [-12, 8, 11, 5, 10, 0x8b6f62],
   [12, 8, 12, 11, 12, 0x6d7887],
   [-38, -34, 10, 4, 10, 0x9d6a4f],
   [34, -34, 14, 5, 10, 0xb28b47],
   [-38, 34, 12, 9, 12, 0x6d7887],
-  [-8, 34, 16, 17, 16, 0x596472],
+  [-8, 34, 16, 17, 16, 0x707878],
   [10, 35, 14, 5, 10, 0xb28b47],
   [36, 34, 10, 4, 10, 0x9d6a4f],
   [-37, 0, 10, 4, 10, 0x9d6a4f],
   [37, 0, 12, 12, 12, 0x6d7887],
-  [-36, -4, 8, 4, 8, 0x7a6655],
+  [-36, -4, 8, 4, 8, 0x796b5f],
   [33, 10, 8, 4, 8, 0x7a6655],
 ];
 
@@ -68,20 +68,20 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x182019, 0.009);
+scene.fog = new THREE.FogExp2(0x5a6666, 0.010);
 const bgCanvas = document.createElement('canvas');
 bgCanvas.width = 2; bgCanvas.height = 256;
 const bgctx = bgCanvas.getContext('2d');
 const bgGrad = bgctx.createLinearGradient(0, 0, 0, 256);
-bgGrad.addColorStop(0, '#1c2520');
-bgGrad.addColorStop(1, '#101512');
+bgGrad.addColorStop(0, '#6c7d83');
+bgGrad.addColorStop(1, '#40504f');
 bgctx.fillStyle = bgGrad; bgctx.fillRect(0, 0, 2, 256);
 scene.background = new THREE.CanvasTexture(bgCanvas);
 
 const camera = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.1, 400);
-const ambient = new THREE.AmbientLight(0x9cafb1, 1.35);
+const ambient = new THREE.AmbientLight(0xc0c0c0, 1.45);
 scene.add(ambient);
-const sun = new THREE.DirectionalLight(0xfff0cf, 2.15);
+const sun = new THREE.DirectionalLight(0xfff4d0, 2.05);
 sun.position.set(40, 65, 24);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1536, 1536);
@@ -90,18 +90,18 @@ scene.add(sun);
 
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(WORLD, WORLD),
-  new THREE.MeshLambertMaterial({ color: 0x27352c })
+  new THREE.MeshLambertMaterial({ color: 0x62685b })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-const grid = new THREE.GridHelper(WORLD, 50, 0x1e2b22, 0x1e2b22);
+const grid = new THREE.GridHelper(WORLD, 50, 0x54594f, 0x54594f);
 grid.position.y = 0.005;
 scene.add(grid);
 
-const roadMat = new THREE.MeshLambertMaterial({ color: 0x1a1d20 });
-const dashMat = new THREE.MeshBasicMaterial({ color: 0x9ca8af });
+const roadMat = new THREE.MeshLambertMaterial({ color: 0x454545 });
+const dashMat = new THREE.MeshBasicMaterial({ color: 0xc0c0a0 });
 function addRoad(w, d, x, z) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), roadMat);
   m.rotation.x = -Math.PI / 2;
@@ -151,13 +151,13 @@ const baseCenter = new THREE.Vector3(0, 0, -39);
 const baseSize = { x: 18, z: 10 };
 const baseFloor = new THREE.Mesh(
   new THREE.BoxGeometry(baseSize.x, 0.25, baseSize.z),
-  new THREE.MeshLambertMaterial({ color: 0x37433a })
+  new THREE.MeshLambertMaterial({ color: 0x707870 })
 );
 baseFloor.position.set(baseCenter.x, 0.12, baseCenter.z);
 baseFloor.receiveShadow = true;
 scene.add(baseFloor);
 
-const baseWallMat = mat(0x3d473f);
+const baseWallMat = mat(0x7c817c);
 for (const [w, d, x, z, y] of [
   [18, 0.5, 0, -44, 1.25],
   [6.0, 0.5, -6, -34, 1.25], [6.0, 0.5, 6, -34, 1.25],
@@ -170,7 +170,7 @@ for (const [w, d, x, z, y] of [
 }
 const baseMarker = new THREE.Mesh(
   new THREE.CylinderGeometry(4.2, 4.2, 0.12, 32),
-  new THREE.MeshBasicMaterial({ color: 0x55745d, transparent: true, opacity: 0.35 })
+  new THREE.MeshBasicMaterial({ color: 0x008080, transparent: true, opacity: 0.25 })
 );
 baseMarker.position.set(baseCenter.x, 0.08, baseCenter.z);
 scene.add(baseMarker);
@@ -884,7 +884,7 @@ function updateLighting() {
   sun.position.set(Math.cos(t * Math.PI * 2) * 45, 25 + daylight * 50, Math.sin(t * Math.PI * 2) * 35);
   sun.intensity = 0.35 + daylight * 2.0;
   ambient.intensity = 0.52 + daylight * 1.0;
-  scene.fog.density = 0.007 + night * 0.007;
+  scene.fog.density = 0.008 + night * 0.009;
   document.body.classList.toggle('night', night > 0.55);
 }
 
