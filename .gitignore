@@ -1,0 +1,6 @@
+.godot/
+build/
+dist/
+.vscode/
+.idea/
+*.tmp
