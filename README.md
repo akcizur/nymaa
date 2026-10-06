@@ -1,35 +1,36 @@
-# Nymaa — GTA-style Top-Down Game
+# Nymaa — Godot 4 Top-Down City
 
-A small Three.js blockout focused on the core loop:
+Godot 4.x rewrite of the original GTA-style top-down blockout.
 
-- top-down city
+## Gameplay
+
+- top-down city blockout
+- 13 simple building colliders
+- 4 roads
 - walkable player
-- drivable car
-- building AABB collisions
-- enter / exit vehicle
-- desktop keyboard controls
-- touch joystick controls for phones and tablets
-- mobile renderer optimizations
-- automatic GitHub Pages build and deployment
+- drivable arcade car
+- enter / exit with E
+- touch joystick on phones and tablets
+- touch action button
+- interpolated top-down camera
+- Compatibility renderer for lightweight Web/WebGL deployment
 
-## Development
+## Local
 
-```bash
-npm install
-npm run dev
-```
-
-## Production
-
-```bash
-npm run build
-npm run preview
-```
-
-GitHub Actions builds `dist/` on every push to `main` and deploys it to GitHub Pages.
+Open the project in Godot 4.6.x and run Main.tscn.
 
 ## Controls
 
-Desktop: WASD / arrows to move or drive, E to enter/exit.
+Desktop:
+- WASD / arrow keys — move
+- E — enter / exit car
 
-Touch: drag the left joystick to move/drive. The contextual ENTER/EXIT button appears when available.
+Mobile:
+- left joystick — walk / drive
+- right E button — enter / exit
+
+## GitHub Pages
+
+Pushing to main runs a GitHub Actions Web export with Godot 4.6.3 and deploys the generated build to GitHub Pages.
+
+The Web preset is single-threaded. Godot documents single-threaded Web export as the broadly compatible option because threaded builds require cross-origin isolation headers.
