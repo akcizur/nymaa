@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Top-Down City</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d1117;
+    font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c9d3dd}
+  canvas{display:block}
+  #hud{position:fixed;left:14px;top:14px;padding:10px 14px;
+    background:rgba(13,17,23,.72);border:1px solid rgba(127,209,255,.14);
+    border-radius:8px;pointer-events:none;letter-spacing:.04em;
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  #hud b{color:#7fd1ff;font-weight:600}
+  #mode{color:#ffd479;font-weight:700;margin-top:6px;padding-top:6px;
+    border-top:1px solid rgba(127,209,255,.14)}
+  #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    font:14px ui-monospace,monospace;color:#7fd1ff;background:#0d1117;
+    letter-spacing:.1em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div id="load">loading…</div>
+<div id="hud">
+  <div><b>WASD</b>/<b>↑↓←→</b> pohyb · <b>E</b> auto · <b>R</b> reset</div>
+  <div id="mode">ON FOOT</div>
+</div>
+
+<script type="module">
+let THREE;
+try {
+  THREE = await import('https://unpkg.com/three@0.160.0/build/three.module.js');
+} catch {
+  try { THREE = await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js'); }
+  catch { document.getElementById('load').textContent = 'chyba: three.js se nenačetl'; throw 0; }
+}
+document.getElementById('load').remove();
+
+/* ── KONSTANTY ─────────────────────────────────────────────── */
+const W = 100, HALF = W / 2;
+const mat = c => new THREE.MeshLambertMaterial({ color: c });
+
+/* ── RENDERER / SCÉNA / KAMERA ─────────────────────────────── */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+// gradient obloha
+{
+  const c = document.createElement('canvas');
+  c.width = 2; c.height = 256;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, '#1a2230');
+  g.addColorStop(1, '#0d1117');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 2, 256);
+  scene.background = new THREE.CanvasTexture(c);
+}
+scene.fog = new THREE.Fog(0x0d1117, 75, 145);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 400);
+
+/* ── SVĚTLO ────────────────────────────────────────────────── */
+scene.add(new THREE.AmbientLight(0x94a8bf, 1.5));
+const sun = new THREE.DirectionalLight(0xfff2d8, 2.4);
+sun.position.set(42, 62, 28);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, {
+  near: 1, far: 200, left: -62, right: 62, top: 62, bottom: -62,
+});
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+
+/* ── ZEM + GRID ────────────────────────────────────────────── */
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, W), mat(0x2a3830));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const grid = new THREE.GridHelper(W, 50, 0x1e2a24, 0x1e2a24);
+grid.position.y = 0.005;
+scene.add(grid);
+
+/* ── SILNICE + ČÁRY ────────────────────────────────────────── */
+const roadMat = mat(0x1a1d22);
+const dashMat = new THREE.MeshBasicMaterial({ color: 0xb8c2cc });
+const dashGeoH = new THREE.PlaneGeometry(4, 0.35);
+const dashGeoV = new THREE.PlaneGeometry(0.35, 4);
+
+function road(w, d, x, z) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), roadMat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, 0.02, z);
+  m.receiveShadow = true;
+  scene.add(m);
+}
+function dashes(axis, fixed) {
+  const geo = axis === 'x' ? dashGeoH : dashGeoV;
+  for (let v = -HALF + 5; v < HALF - 4; v += 10) {
+    const m = new THREE.Mesh(geo, dashMat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(axis === 'x' ? v : fixed, 0.028, axis === 'x' ? fixed : v);
+    scene.add(m);
+  }
+}
+road(W, 10, 0, -20); road(W, 10, 0, 20);
+road(10, W, -25, 0); road(10, W, 25, 0);
+dashes('x', -20); dashes('x', 20); dashes('z', -25); dashes('z', 25);
+
+/* ── BUDOVY ────────────────────────────────────────────────── */
+const colliders = [];
+const winMat = new THREE.MeshBasicMaterial({ color: 0xfff0b0 });
+
+const BUILDINGS = [
+  [-10, -6, 12, 12, 12, 0x76839a],
+  [  8, -8, 14,  5, 10, 0xc9a24a],
+  [-12,  8, 10,  4, 10, 0xb87b52],
+  [ 10,  8, 12, 12, 12, 0x76839a],
+  [-38,-35, 10,  4, 10, 0xb87b52],
+  [  0,-35, 20,  6, 14, 0x8a97a5],
+  [ 37,-35, 14,  5, 10, 0xc9a24a],
+  [-38, 35, 12, 12, 12, 0x76839a],
+  [ -8, 35, 16, 20, 16, 0x5f6a7a],
+  [ 10, 35, 14,  5, 10, 0xc9a24a],
+  [ 37, 35, 10,  4, 10, 0xb87b52],
+  [-37,  0, 10,  4, 10, 0xb87b52],
+  [ 37,  0, 12, 12, 12, 0x76839a],
+];
+
+for (const [x, z, w, h, d, c] of BUILDINGS) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c));
+  body.position.y = h / 2;
+  body.castShadow = body.receiveShadow = true;
+  g.add(body);
+
+  for (let y = 2.2; y < h - 0.8; y += 2.8) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(w + 0.06, 0.22, d + 0.06), winMat);
+    win.position.y = y;
+    g.add(win);
+  }
+
+  scene.add(g);
+  colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
+}
+
+/* ── HRANICE SVĚTA ─────────────────────────────────────────── */
+{
+  const wm = mat(0x2a3038);
+  for (const [w, d, x, z] of [
+    [W, 1, 0, -HALF], [W, 1, 0, HALF],
+    [1, W, -HALF, 0], [1, W, HALF, 0],
+  ]) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 3, d), wm);
+    m.position.set(x, 1.5, z);
+    m.castShadow = m.receiveShadow = true;
+    scene.add(m);
+    colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
+  }
+}
+
+/* ── PLAYER ────────────────────────────────────────────────── */
+const player = new THREE.Group();
+{
+  const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.72, 6, 12), mat(0x4fa3e3));
+  b.position.y = 0.72; b.castShadow = true;
+  const h = new THREE.Mesh(new THREE.SphereGeometry(0.30, 16, 12), mat(0xf0c9a0));
+  h.position.y = 1.52; h.castShadow = true;
+  const n = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.26), mat(0x14324a));
+  n.position.set(0, 1.52, 0.30);
+  player.add(b, h, n);
+}
+player.position.set(0, 0, -20);
+player.rotation.y = Math.PI;
+scene.add(player);
+
+/* ── AUTO ──────────────────────────────────────────────────── */
+const car = new THREE.Group();
+{
+  const b = new THREE.Mesh(new THREE.BoxGeometry(2, 0.7, 4.4), mat(0xd94f4f));
+  b.position.y = 0.75; b.castShadow = true;
+
+  const c = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.62, 2), mat(0x1a1e26));
+  c.position.set(0, 1.4, -0.25); c.castShadow = true;
+
+  car.add(b, c);
+
+  const wg = new THREE.CylinderGeometry(0.42, 0.42, 0.32, 14); wg.rotateZ(Math.PI / 2);
+  const wm = mat(0x15181d);
+  for (const [x, z] of [[-1.02, 1.45], [1.02, 1.45], [-1.02, -1.45], [1.02, -1.45]]) {
+    const w = new THREE.Mesh(wg, wm);
+    w.position.set(x, 0.42, z);
+    w.castShadow = true;
+    car.add(w);
+  }
+
+  const lm = new THREE.MeshBasicMaterial({ color: 0xfff2b8 });
+  for (const x of [-0.62, 0.62]) {
+    const l = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.08), lm);
+    l.position.set(x, 0.82, 2.21);
+    car.add(l);
+  }
+}
+car.position.set(6, 0, -20);
+scene.add(car);
+
+/* ── INPUT ─────────────────────────────────────────────────── */
+const keys = new Set();
+let enter = false, reset = false;
+addEventListener('keydown', e => {
+  if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+  if (e.code === 'KeyE' && !keys.has('KeyE')) enter = true;
+  if (e.code === 'KeyR' && !keys.has('KeyR')) reset = true;
+  keys.add(e.code);
+});
+addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('blur', () => keys.clear());
+
+/* ── KOLIZE ────────────────────────────────────────────────── */
+function insideAny(x, z, r) {
+  for (const c of colliders) {
+    const cx = Math.max(c.minX, Math.min(x, c.maxX));
+    const cz = Math.max(c.minZ, Math.min(z, c.maxZ));
+    const dx = x - cx, dz = z - cz;
+    if (dx * dx + dz * dz < r * r) return true;
+  }
+  return false;
+}
+
+function pushOut(p, r) {
+  for (let pass = 0; pass < 2; pass++) {
+    let hit = false;
+    for (const c of colliders) {
+      const cx = Math.max(c.minX, Math.min(p.x, c.maxX));
+      const cz = Math.max(c.minZ, Math.min(p.z, c.maxZ));
+      const dx = p.x - cx, dz = p.z - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= r * r) continue;
+      hit = true;
+      if (d2 > 1e-8) {
+        const d = Math.sqrt(d2), k = (r - d) / d;
+        p.x += dx * k; p.z += dz * k;
+      } else {
+        const dl = p.x - c.minX, dr = c.maxX - p.x;
+        const db = p.z - c.minZ, df = c.maxZ - p.z;
+        const m = Math.min(dl, dr, db, df);
+        if (m === dl) p.x = c.minX - r;
+        else if (m === dr) p.x = c.maxX + r;
+        else if (m === db) p.z = c.minZ - r;
+        else p.z = c.maxZ + r;
+      }
+    }
+    if (!hit) break;
+  }
+}
+
+const CAR_R = 1.1, CAR_OFF = 1.3;
+
+function pushCar(obj) {
+  for (const s of [CAR_OFF, -CAR_OFF]) {
+    const p = {
+      x: obj.position.x + Math.sin(obj.rotation.y) * s,
+      z: obj.position.z + Math.cos(obj.rotation.y) * s,
+    };
+    const bx = p.x, bz = p.z;
+    pushOut(p, CAR_R);
+    obj.position.x += p.x - bx;
+    obj.position.z += p.z - bz;
+  }
+}
+
+function carBlocked() {
+  for (const s of [CAR_OFF, -CAR_OFF]) {
+    const px = car.position.x + Math.sin(car.rotation.y) * s;
+    const pz = car.position.z + Math.cos(car.rotation.y) * s;
+    if (insideAny(px, pz, CAR_R)) return true;
+  }
+  return false;
+}
+
+const clampW = (p, m) => {
+  const l = HALF - m;
+  p.x = Math.max(-l, Math.min(l, p.x));
+  p.z = Math.max(-l, Math.min(l, p.z));
+};
+
+/* ── STAV ──────────────────────────────────────────────────── */
+let driving = false;
+const cs = { speed: 0 };
+const P = { speed: 7, r: 0.45, range: 4.2, rot: 14 };
+const C = { max: 24, maxRev: 9, accel: 16, brake: 32, drag: 2.4, steer: 2.2 };
+
+/* ── PLAYER UPDATE (camera-relative) ───────────────────────── */
+// W = nahoru na obrazovce, S = dolů, A = vlevo, D = vpravo
+// Světový směr se odvozuje od aktuálního natočení kamery (camYaw).
+function updatePlayer(dt) {
+  let ix = 0, iz = 0;
+  if (keys.has('KeyW') || keys.has('ArrowUp'))    iz += 1;   // dopředu (nahoru na obrazovce)
+  if (keys.has('KeyS') || keys.has('ArrowDown'))  iz -= 1;   // dozadu
+  if (keys.has('KeyA') || keys.has('ArrowLeft'))  ix -= 1;   // vlevo
+  if (keys.has('KeyD') || keys.has('ArrowRight')) ix += 1;   // vpravo
+
+  const len = Math.hypot(ix, iz);
+  if (len > 0) {
+    ix /= len; iz /= len;
+
+    // "nahoru" na obrazovce = směr pohledu kamery (world)
+    const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
+    // "doprava" na obrazovce = kolmice (otočeno o -90°)
+    const rx = -fz,             rz =  fx;
+
+    // světový směr = kombinace os obrazovky
+    const wx = iz * fx + ix * rx;
+    const wz = iz * fz + ix * rz;
+
+    player.position.x += wx * P.speed * dt;
+    player.position.z += wz * P.speed * dt;
+
+    // postava se otočí čelem ke směru pohybu
+    const t = Math.atan2(wx, wz);
+    const d = Math.atan2(Math.sin(t - player.rotation.y), Math.cos(t - player.rotation.y));
+    player.rotation.y += d * (1 - Math.exp(-P.rot * dt));
+  }
+  pushOut(player.position, P.r);
+  clampW(player.position, P.r + 0.1);
+}
+
+/* ── CAR UPDATE (world-relative — auto se ovládá jako vozidlo) */
+function updateCar(dt) {
+  let th = 0;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) th += 1;
+  if (keys.has('KeyS') || keys.has('ArrowDown')) th -= 1;
+
+  if (th > 0) cs.speed += C.accel * dt;
+  else if (th < 0) cs.speed -= (cs.speed > 0.2 ? C.brake : C.accel * 0.6) * dt;
+  else {
+    cs.speed -= cs.speed * C.drag * dt;
+    if (Math.abs(cs.speed) < 0.05) cs.speed = 0;
+  }
+  cs.speed = Math.max(-C.maxRev, Math.min(C.max, cs.speed));
+
+  let st = 0;
+  if (keys.has('KeyD') || keys.has('ArrowRight')) st += 1;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) st -= 1;
+
+  if (st && Math.abs(cs.speed) > 0.3) {
+    const grip = Math.min(1, Math.abs(cs.speed) / 6);
+    const prev = car.rotation.y;
+    car.rotation.y += st * C.steer * dt * grip * Math.sign(cs.speed);
+    if (carBlocked()) car.rotation.y = prev;
+  }
+
+  car.position.x += Math.sin(car.rotation.y) * cs.speed * dt;
+  car.position.z += Math.cos(car.rotation.y) * cs.speed * dt;
+
+  const bx = car.position.x, bz = car.position.z;
+  pushCar(car);
+  if (Math.hypot(car.position.x - bx, car.position.z - bz) > 0.001) cs.speed *= 0.3;
+  clampW(car.position, 2.6);
+}
+
+/* ── KAMERA s dynamickým sledováním směru ─────────────────── */
+const focus = new THREE.Vector3(0, 0, -20);
+let camYaw = Math.PI;
+
+const CAM_LERP_YAW   = 3.5;
+const CAM_LERP_FOCUS = 7.0;
+const CAM_LERP_POS   = 6.0;
+
+function updateCamera(dt, snap) {
+  const sub = driving ? car : player;
+  const targetYaw = sub.rotation.y;
+
+  // nejkratší cestou kolem kruhu
+  let d = targetYaw - camYaw;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  camYaw += d * (snap ? 1 : 1 - Math.exp(-CAM_LERP_YAW * dt));
+
+  const dist   = driving ? 16 : 13;
+  const height = driving ? 23 : 19;
+  const ahead  = driving ? 4.5 : 0;
+
+  const tx = sub.position.x + (driving ? Math.sin(sub.rotation.y) * ahead : 0);
+  const tz = sub.position.z + (driving ? Math.cos(sub.rotation.y) * ahead : 0);
+  const k  = snap ? 1 : 1 - Math.exp(-CAM_LERP_FOCUS * dt);
+  focus.x += (tx - focus.x) * k;
+  focus.z += (tz - focus.z) * k;
+
+  // kamera ZA subjektem podle camYaw
+  const des = new THREE.Vector3(
+    focus.x - Math.sin(camYaw) * dist,
+    height,
+    focus.z - Math.cos(camYaw) * dist
+  );
+  camera.position.lerp(des, snap ? 1 : 1 - Math.exp(-CAM_LERP_POS * dt));
+  if (camera.position.y < 6) camera.position.y = 6;
+  camera.lookAt(focus.x, 1, focus.z);
+}
+
+/* ── ENTER / EXIT ──────────────────────────────────────────── */
+function exitSpot() {
+  const r = 2.4;
+  for (const s of [1, -1]) {
+    const x = car.position.x + Math.cos(car.rotation.y) * s * r;
+    const z = car.position.z - Math.sin(car.rotation.y) * s * r;
+    if (!insideAny(x, z, P.r + 0.1)) return { x, z };
+  }
+  return {
+    x: car.position.x - Math.sin(car.rotation.y) * 3,
+    z: car.position.z - Math.cos(car.rotation.y) * 3,
+  };
+}
+
+function toggleCar() {
+  if (!driving) {
+    if (player.position.distanceTo(car.position) > P.range) return;
+    driving = true;
+    player.visible = false;
+  } else {
+    driving = false;
+    player.visible = true;
+    player.rotation.y = car.rotation.y;
+    const p = exitSpot();
+    player.position.set(p.x, 0, p.z);
+    pushOut(player.position, P.r);
+    clampW(player.position, P.r + 0.1);
+  }
+}
+
+/* ── RESET ─────────────────────────────────────────────────── */
+function resetGame() {
+  driving = false;
+  player.position.set(0, 0, -20);
+  player.rotation.y = Math.PI;
+  player.visible = true;
+  car.position.set(6, 0, -20);
+  car.rotation.y = 0;
+  cs.speed = 0;
+  focus.set(0, 0, -20);
+  camYaw = Math.PI;
+  camera.position.set(0, 19, 7);
+}
+
+/* ── LOOP ──────────────────────────────────────────────────── */
+const modeEl = document.getElementById('mode');
+const clock = new THREE.Clock();
+let snap = true, hudTick = 0;
+
+function loop() {
+  requestAnimationFrame(loop);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if (reset) { resetGame(); reset = false; snap = true; }
+  if (enter) { toggleCar(); enter = false; }
+
+  driving ? updateCar(dt) : updatePlayer(dt);
+  updateCamera(dt, snap);
+  snap = false;
+
+  hudTick += dt;
+  if (hudTick > 0.1) {
+    hudTick = 0;
+    modeEl.textContent = driving
+      ? `DRIVING · ${Math.round(Math.abs(cs.speed) * 3.6)} km/h`
+      : 'ON FOOT';
+  }
+
+  renderer.render(scene, camera);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+updateCamera(0, true);
+loop();
+</script>
+</body>
+</html>
