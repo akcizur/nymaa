@@ -12,8 +12,8 @@ extends Camera3D
 var _focus := Vector3.ZERO
 var _follow_smooth := 7.0
 var _camera_smooth := 6.0
-var player: Node3D
-var vehicle: Node3D
+var player
+var vehicle
 
 func _ready() -> void:
 	player = get_node_or_null(player_path)
@@ -26,7 +26,7 @@ func _process(delta: float) -> void:
 		return
 
 	var driving: bool = vehicle.controlled
-	var subject: Node3D = vehicle if driving else player
+	var subject = vehicle if driving else player
 	var height := car_height if driving else foot_height
 	var dist := car_dist if driving else foot_dist
 	var look_ahead := car_look_ahead if driving else 0.0
