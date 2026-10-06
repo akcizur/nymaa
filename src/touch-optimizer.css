@@ -1,0 +1,90 @@
+:root{
+  --touch-stick-size: clamp(112px, 18vw, 148px);
+  --touch-button-size: clamp(46px, 7vw, 62px);
+  --touch-gap: clamp(7px, 1.5vw, 12px);
+}
+
+@media (pointer: coarse){
+  .touch{
+    --touch-size: var(--touch-stick-size);
+    padding:
+      max(0px, env(safe-area-inset-top))
+      max(0px, env(safe-area-inset-right))
+      max(0px, env(safe-area-inset-bottom))
+      max(0px, env(safe-area-inset-left));
+  }
+
+  .touch-zone--left{width:55%;}
+  .touch-zone--right{width:55%;}
+
+  .touch-stick{
+    width:var(--touch-stick-size);
+    height:var(--touch-stick-size);
+    margin:calc(var(--touch-stick-size) / -2) 0 0 calc(var(--touch-stick-size) / -2);
+    border-width:2px;
+    background:rgba(0,0,0,.28);
+  }
+
+  .touch-stick span{
+    width:clamp(44px, 7vw, 58px);
+    height:clamp(44px, 7vw, 58px);
+    margin:calc(clamp(44px, 7vw, 58px) / -2);
+  }
+
+  .touch-actions{
+    right:max(12px, env(safe-area-inset-right));
+    bottom:max(12px, env(safe-area-inset-bottom));
+    width:clamp(150px, 30vw, 190px);
+    height:clamp(166px, 31vw, 210px);
+  }
+
+  .touch-action{
+    width:var(--touch-button-size);
+    height:var(--touch-button-size);
+    min-width:44px;
+    min-height:44px;
+    font-size:clamp(10px, 2.2vw, 12px);
+    -webkit-user-select:none;
+    user-select:none;
+  }
+
+  .touch-action--jump{right:0;top:0}
+  .touch-action--interact{right:calc(var(--touch-button-size) + var(--touch-gap));top:calc(var(--touch-button-size) * .55)}
+  .touch-action--punch{right:0;top:calc(var(--touch-button-size) + var(--touch-gap))}
+  .touch-action--run{left:0;top:calc(var(--touch-button-size) * 1.95)}
+  .touch-action--utility{left:0;top:calc(var(--touch-button-size) * .85)}
+
+  .touch-action::after{
+    display:block;
+    margin-top:1px;
+    font-size:7px;
+    font-weight:normal;
+    opacity:.72;
+  }
+  #touch-jump::after{content:'JUMP'}
+  #touch-interact::after{content:'USE'}
+  #touch-punch::after{content:'ATTACK'}
+  #touch-run::after{content:'RUN'}
+  #touch-inventory::after{content:'BAG'}
+
+  .touch-action.is-active{
+    transform:scale(.93);
+    filter:brightness(1.18);
+  }
+
+  .panel--hint{bottom:calc(142px + env(safe-area-inset-bottom));}
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (max-height:520px){
+  .touch-actions{
+    transform:scale(.88);
+    transform-origin:right bottom;
+    right:max(8px, env(safe-area-inset-right));
+    bottom:max(8px, env(safe-area-inset-bottom));
+  }
+  .panel--hint{bottom:calc(88px + env(safe-area-inset-bottom));}
+}
+
+@media (pointer: coarse) and (max-width:420px){
+  .touch-actions{transform:scale(.94);transform-origin:right bottom;}
+}
