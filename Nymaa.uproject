@@ -1,0 +1,13 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.6",
+  "Category": "Games",
+  "Description": "Minimal Unreal Engine 5 top-down city blockout",
+  "Modules": [
+    {
+      "Name": "Nymaa",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}
