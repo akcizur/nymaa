@@ -283,8 +283,8 @@ const onKey = (e, down) => {
   if (down && e.repeat) return;
   if (down && e.code === 'KeyE') actionQueued = true;
   if (down && e.code === 'KeyI') togglePanel('inventory');
-  if (down && e.code === 'KeyC') togglePanel('craft');
-  if (down && e.code === 'KeyB') togglePanel('base');
+  if (down && e.code === 'KeyC' && nearBase()) togglePanel('craft');
+  if (down && e.code === 'KeyB' && nearBase()) togglePanel('base');
   if (down && e.code === 'KeyR') resetGame();
   if (down && e.code === 'KeyL') loadGame(true);
   if (down && e.code === 'KeyK') saveGame(true);
