@@ -416,6 +416,8 @@ for (const [id, visible] of Object.entries(state.loot)) lootObjects.get(id).visi
 // Input
 const keys = new Set();
 const touchAxis = { x: 0, z: 0 };
+const touchLook = { x: 0, y: 0 };
+let touchRun = false;
 let actionQueued = false;
 const onKey = (e, down) => {
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
@@ -437,27 +439,126 @@ addEventListener('keyup', e => onKey(e, false));
 addEventListener('blur', () => keys.clear());
 
 const touch = document.getElementById('touch');
+const leftZone = document.getElementById('touch-left-zone');
+const rightZone = document.getElementById('touch-right-zone');
+const leftStick = document.getElementById('touch-left-stick');
+const rightStick = document.getElementById('touch-right-stick');
+const leftKnob = leftStick.querySelector('span');
+const rightKnob = rightStick.querySelector('span');
+const touchPointers = { left: null, right: null };
+const TOUCH_MAX = 42;
+
 if (matchMedia('(pointer: coarse)').matches) touch.classList.remove('hidden');
-const stick = document.getElementById('stick');
-const knob = stick.querySelector('span');
-let pointerId = null;
-function updateStick(clientX, clientY) {
-  const r = stick.getBoundingClientRect();
-  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-  const max = r.width * .36;
-  let dx = clientX - cx, dy = clientY - cy;
-  const d = Math.hypot(dx, dy);
-  if (d > max) { dx = dx / d * max; dy = dy / d * max; }
-  knob.style.transform = `translate(${dx}px,${dy}px)`;
-  touchAxis.x = dx / max;
-  touchAxis.z = -dy / max;
+
+function resetTouchStick(kind) {
+  const stickEl = kind === 'left' ? leftStick : rightStick;
+  const knobEl = kind === 'left' ? leftKnob : rightKnob;
+  const axis = kind === 'left' ? touchAxis : touchLook;
+  const pointerKey = kind === 'left' ? 'left' : 'right';
+
+  touchPointers[pointerKey] = null;
+  axis.x = 0;
+  if (kind === 'left') axis.z = 0;
+  else axis.y = 0;
+  knobEl.style.transform = 'translate(0,0)';
+  stickEl.classList.add('hidden');
 }
-stick.addEventListener('pointerdown', e => { pointerId = e.pointerId; stick.setPointerCapture(pointerId); updateStick(e.clientX, e.clientY); });
-stick.addEventListener('pointermove', e => { if (e.pointerId === pointerId) updateStick(e.clientX, e.clientY); });
-stick.addEventListener('pointerup', e => { if (e.pointerId === pointerId) { pointerId = null; touchAxis.x = touchAxis.z = 0; knob.style.transform = 'translate(0,0)'; } });
-stick.addEventListener('pointercancel', () => { pointerId = null; touchAxis.x = touchAxis.z = 0; knob.style.transform = 'translate(0,0)'; });
-document.getElementById('touch-interact').addEventListener('pointerdown', () => { actionQueued = true; });
-document.getElementById('touch-inventory').addEventListener('pointerdown', () => togglePanel('inventory'));
+
+function updateDynamicStick(kind, clientX, clientY) {
+  const stickEl = kind === 'left' ? leftStick : rightStick;
+  const knobEl = kind === 'left' ? leftKnob : rightKnob;
+  const axis = kind === 'left' ? touchAxis : touchLook;
+  const anchorX = Number(stickEl.dataset.anchorX);
+  const anchorY = Number(stickEl.dataset.anchorY);
+
+  let dx = clientX - anchorX;
+  let dy = clientY - anchorY;
+  const distance = Math.hypot(dx, dy);
+  if (distance > TOUCH_MAX) {
+    dx = dx / distance * TOUCH_MAX;
+    dy = dy / distance * TOUCH_MAX;
+  }
+
+  knobEl.style.transform = `translate(${dx}px,${dy}px)`;
+  axis.x = dx / TOUCH_MAX;
+  if (kind === 'left') axis.z = -dy / TOUCH_MAX;
+  else axis.y = dy / TOUCH_MAX;
+}
+
+function beginDynamicStick(kind, event) {
+  const pointerKey = kind === 'left' ? 'left' : 'right';
+  if (touchPointers[pointerKey] !== null) return;
+
+  touchPointers[pointerKey] = event.pointerId;
+  const stickEl = kind === 'left' ? leftStick : rightStick;
+  stickEl.dataset.anchorX = String(event.clientX);
+  stickEl.dataset.anchorY = String(event.clientY);
+  stickEl.style.left = `${event.clientX}px`;
+  stickEl.style.top = `${event.clientY}px`;
+  stickEl.classList.remove('hidden');
+
+  const zone = kind === 'left' ? leftZone : rightZone;
+  try { zone.setPointerCapture(event.pointerId); } catch {}
+  updateDynamicStick(kind, event.clientX, event.clientY);
+  event.preventDefault();
+}
+
+function moveDynamicStick(kind, event) {
+  const pointerKey = kind === 'left' ? 'left' : 'right';
+  if (touchPointers[pointerKey] !== event.pointerId) return;
+  updateDynamicStick(kind, event.clientX, event.clientY);
+  event.preventDefault();
+}
+
+function endDynamicStick(kind, event) {
+  const pointerKey = kind === 'left' ? 'left' : 'right';
+  if (touchPointers[pointerKey] !== event.pointerId) return;
+  resetTouchStick(kind);
+  event.preventDefault();
+}
+
+for (const eventName of ['pointerdown','pointermove','pointerup','pointercancel']) {
+  leftZone.addEventListener(eventName, (event) => {
+    if (eventName === 'pointerdown') beginDynamicStick('left', event);
+    else if (eventName === 'pointermove') moveDynamicStick('left', event);
+    else endDynamicStick('left', event);
+  });
+  rightZone.addEventListener(eventName, (event) => {
+    if (eventName === 'pointerdown') beginDynamicStick('right', event);
+    else if (eventName === 'pointermove') moveDynamicStick('right', event);
+    else endDynamicStick('right', event);
+  });
+}
+
+const bindTouchAction = (id, onDown, onUp = null) => {
+  const button = document.getElementById(id);
+  button.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    button.classList.add('is-active');
+    onDown();
+  });
+  const release = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    button.classList.remove('is-active');
+    onUp?.();
+  };
+  button.addEventListener('pointerup', release);
+  button.addEventListener('pointercancel', release);
+};
+
+bindTouchAction('touch-interact', () => { actionQueued = true; });
+bindTouchAction('touch-jump', () => playPlayerOneShot('Jump', 1.0));
+bindTouchAction('touch-punch', () => playPlayerOneShot('Punch', 1.05));
+bindTouchAction('touch-run', () => { touchRun = true; }, () => { touchRun = false; });
+bindTouchAction('touch-inventory', () => togglePanel('inventory'));
+
+addEventListener('blur', () => {
+  touchRun = false;
+  resetTouchStick('left');
+  resetTouchStick('right');
+});
 
 // UI
 const panels = ['inventory','craft','base'];
@@ -839,6 +940,7 @@ function updateHint() {
 
 const focus = new THREE.Vector3(0, 0, -39);
 let camYaw = Math.PI;
+let camPitch = 0.95;
 let flashClock = 0;
 const clock = new THREE.Clock();
 
@@ -853,7 +955,7 @@ function getInput() {
 }
 
 function isRunning() {
-  return keys.has('ShiftLeft') || keys.has('ShiftRight');
+  return touchRun || keys.has('ShiftLeft') || keys.has('ShiftRight');
 }
 function pushOut(p, r) {
   for (let pass = 0; pass < 2; pass++) {
@@ -964,23 +1066,30 @@ function updateLighting() {
 }
 
 function updateCamera(dt, snap = false) {
-  // Camera heading is a stable control reference.
-  // It follows the player position only; it never redefines WASD mid-move.
+  if (touchLook.x || touchLook.y) {
+    camYaw -= touchLook.x * 2.15 * dt;
+    camPitch = THREE.MathUtils.clamp(
+      camPitch + touchLook.y * 1.25 * dt,
+      0.62,
+      1.16
+    );
+  }
+
   const k = snap ? 1 : 1 - Math.exp(-8 * dt);
   focus.x += (player.position.x - focus.x) * k;
   focus.z += (player.position.z - focus.z) * k;
 
-  const dist = 12.5;
-  const height = 18.5;
+  const dist = 13.0;
+  const horizontal = Math.cos(camPitch) * dist;
+  const height = Math.sin(camPitch) * dist;
   const desired = new THREE.Vector3(
-    focus.x - Math.sin(camYaw) * dist,
-    height,
-    focus.z - Math.cos(camYaw) * dist
+    focus.x - Math.sin(camYaw) * horizontal,
+    0.8 + height,
+    focus.z - Math.cos(camYaw) * horizontal
   );
 
   camera.position.lerp(desired, snap ? 1 : 1 - Math.exp(-8 * dt));
-  if (camera.position.y < 6) camera.position.y = 6;
-  camera.lookAt(focus.x, 0.9, focus.z);
+  camera.lookAt(focus.x, 0.8, focus.z);
 }
 
 function closePanelsWhenFar() {
