@@ -5,10 +5,16 @@ import './style.css';
 const SAVE_KEY = 'nymaa-post-catastrophe-mvp-v1';
 const WORLD = 100;
 const HALF = WORLD / 2;
-const PLAYER_R = 0.46;
+const PLAYER_R = 0.38;
 const INTERACT_R = 3.0;
 const GAME_MINUTES_PER_SECOND = 2.5;
 const MAX_INVENTORY = 14;
+const PLAYER_HEIGHT = 1.78;
+const WALK_SPEED = 3.0;
+const RUN_SPEED = 5.6;
+const WALK_ANIM_SPEED = 3.0;
+const RUN_ANIM_SPEED = 5.6;
+const PLAYER_MODEL_YAW = Math.PI;
 
 const ITEM = {
   water: { label: 'WATER', weight: 1 },
@@ -195,14 +201,30 @@ let playerLoaded = false;
 
 const PLAYER_MODEL_URL = `${import.meta.env.BASE_URL}assets/player/demo-avatar.glb`;
 
-function playPlayerAnimation(name, fade = 0.16) {
+function playPlayerAnimation(name, movementSpeed = 0, fade = 0.16) {
   if (!playerMixer || !playerActions.size) return;
-  const wanted = playerActions.get(name) || playerActions.get('Idle');
-  if (!wanted || playerAction === name) return;
+
+  const clipName = playerActions.has(name) ? name : 'Idle';
+  const wanted = playerActions.get(clipName);
+  if (!wanted) return;
+
+  const referenceSpeed =
+    clipName === 'Run' ? RUN_ANIM_SPEED :
+    clipName === 'Walk' ? WALK_ANIM_SPEED : 1;
+
+  const timeScale = clipName === 'Idle'
+    ? 1
+    : THREE.MathUtils.clamp(movementSpeed / referenceSpeed, 0.72, 1.35);
+
+  wanted.setEffectiveTimeScale(timeScale);
+  wanted.setEffectiveWeight(1);
+
+  if (playerAction === clipName) return;
+
   const previous = playerActions.get(playerAction);
   wanted.reset().fadeIn(fade).play();
   if (previous) previous.fadeOut(fade);
-  playerAction = name;
+  playerAction = clipName;
 }
 
 async function loadPlayerModel() {
@@ -225,11 +247,19 @@ async function loadPlayerModel() {
         }
       });
 
+      // The game uses +Z as the canonical player-forward axis.
+      // This asset is authored facing the opposite local direction, so keep
+      // the correction on the visual model rather than corrupting gameplay yaw.
+      root.rotation.set(0, PLAYER_MODEL_YAW, 0);
+
       const bounds = new THREE.Box3().setFromObject(root);
       const size = bounds.getSize(new THREE.Vector3());
-      if (size.y > 0.001) root.scale.setScalar(1.85 / size.y);
+      if (size.y > 0.001) root.scale.setScalar(PLAYER_HEIGHT / size.y);
 
       const fittedBounds = new THREE.Box3().setFromObject(root);
+      const center = fittedBounds.getCenter(new THREE.Vector3());
+      root.position.x -= center.x;
+      root.position.z -= center.z;
       root.position.y -= fittedBounds.min.y;
 
       player.add(root);
@@ -239,9 +269,6 @@ async function loadPlayerModel() {
       playerActions = new Map(
         gltf.animations.map((clip) => [clip.name, playerMixer.clipAction(clip)])
       );
-
-      // Quaternius glTF characters are authored for a +Z gameplay forward axis.
-      root.rotation.y = 0;
 
       playPlayerAnimation('Idle', 0);
       playerLoaded = true;
@@ -818,20 +845,22 @@ function updatePlayer(dt) {
   const wx = input.z * fx + input.x * rx;
   const wz = input.z * fz + input.x * rz;
 
-  const survivalPenalty = Math.min(state.hunger, state.thirst) < 30 ? 0.78 : 1;
+  const survivalPenalty = Math.min(state.hunger, state.thirst) < 30 ? 0.82 : 1;
   const running = isRunning();
-  const speed = (running ? 9.0 : 6.2) * survivalPenalty;
+  const speed = (running ? RUN_SPEED : WALK_SPEED) * survivalPenalty;
 
   player.position.x += wx * speed * dt;
   player.position.z += wz * speed * dt;
   pushOut(player.position, PLAYER_R);
   clampWorld();
 
+  // Gameplay yaw is always the actual world travel direction.
+  // The model's visual yaw correction is isolated inside the GLB root.
   const target = Math.atan2(wx, wz);
   const delta = Math.atan2(Math.sin(target - player.rotation.y), Math.cos(target - player.rotation.y));
-  player.rotation.y += delta * (1 - Math.exp(-13 * dt));
+  player.rotation.y += delta * (1 - Math.exp(-15 * dt));
 
-  playPlayerAnimation(running ? 'Run' : 'Walk');
+  playPlayerAnimation(running ? 'Run' : 'Walk', speed);
 }
 
 function updateSurvival(dt) {
