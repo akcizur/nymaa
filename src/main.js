@@ -852,7 +852,7 @@ function updatePlayer(dt) {
 
   // Keep gameplay movement orientation on the default controller axis.
   // The model's visual yaw offset is handled independently.
-  const targetYaw = Math.atan2(wx, wz) - (Math.PI / 2);
+  const targetYaw = Math.atan2(wx, wz) + (Math.PI / 2);
   const delta = Math.atan2(
     Math.sin(targetYaw - player.rotation.y),
     Math.cos(targetYaw - player.rotation.y)
