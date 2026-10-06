@@ -34,20 +34,22 @@ const RECIPES = [
 ];
 
 const BUILDINGS = [
-  [-10, -7, 12, 10, 12, 0x7d8585],
-  [9, -8, 12, 6, 9, 0x9a8b68],
-  [-12, 8, 11, 5, 10, 0x8b6f62],
-  [12, 8, 12, 11, 12, 0x7d8585],
-  [-38, -34, 10, 4, 10, 0x8b6f62],
-  [34, -34, 14, 5, 10, 0x9a8b68],
-  [-38, 34, 12, 9, 12, 0x7d8585],
-  [-8, 34, 16, 17, 16, 0x707878],
-  [10, 35, 14, 5, 10, 0x9a8b68],
-  [36, 34, 10, 4, 10, 0x8b6f62],
-  [-37, 0, 10, 4, 10, 0x8b6f62],
-  [37, 0, 12, 12, 12, 0x7d8585],
-  [-36, -4, 8, 4, 8, 0x796b5f],
-  [33, 10, 8, 4, 8, 0x796b5f],
+  [-10, -7, 11, 8, 10, 0x7d8585],
+  [9, -8, 10, 6, 9, 0x9a8b68],
+  [-12, 8, 10, 5, 9, 0x8b6f62],
+  [12, 8, 11, 9, 10, 0x7d8585],
+
+  [-39, -35, 8, 4, 8, 0x8b6f62],
+  [35, -35, 10, 5, 8, 0x9a8b68],
+  [-39, 35, 9, 8, 9, 0x7d8585],
+  [-8, 35, 13, 12, 13, 0x707878],
+  [10, 35, 11, 5, 9, 0x9a8b68],
+  [36, 35, 8, 4, 8, 0x8b6f62],
+
+  [-38, 0, 8, 4, 8, 0x8b6f62],
+  [38, 0, 11, 10, 10, 0x7d8585],
+  [-36, -4, 7, 4, 7, 0x796b5f],
+  [34, 10, 7, 4, 7, 0x796b5f],
 ];
 
 const LOOT_SEEDS = [
@@ -103,32 +105,112 @@ const grid = new THREE.GridHelper(WORLD, 50, 0x54594f, 0x54594f);
 grid.position.y = 0.005;
 scene.add(grid);
 
+const ROAD_WIDTH = 9;
+const SIDEWALK_WIDTH = 1.5;
+const CURB_H = 0.12;
+
 const roadMat = new THREE.MeshLambertMaterial({ color: 0x454545 });
-const dashMat = new THREE.MeshBasicMaterial({ color: 0xc0c0a0 });
-function addRoad(w, d, x, z) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), roadMat);
-  m.rotation.x = -Math.PI / 2;
-  m.position.set(x, 0.02, z);
-  m.receiveShadow = true;
-  scene.add(m);
-}
-function addDashes(axis, fixed) {
-  const geo = axis === 'x' ? new THREE.PlaneGeometry(4, 0.28) : new THREE.PlaneGeometry(0.28, 4);
-  for (let v = -45; v <= 45; v += 10) {
-    const m = new THREE.Mesh(geo, dashMat);
-    m.rotation.x = -Math.PI / 2;
-    m.position.set(axis === 'x' ? v : fixed, 0.028, axis === 'x' ? fixed : v);
-    scene.add(m);
+const sidewalkMat = new THREE.MeshLambertMaterial({ color: 0x929292 });
+const curbMat = new THREE.MeshLambertMaterial({ color: 0x6d6d6d });
+const dashMat = new THREE.MeshBasicMaterial({ color: 0xd0d0b5 });
+const crosswalkMat = new THREE.MeshBasicMaterial({ color: 0xc0c0a0 });
+
+function addStreetStrip(axis, fixed, length = WORLD) {
+  const road = new THREE.Mesh(
+    axis === 'x'
+      ? new THREE.PlaneGeometry(length, ROAD_WIDTH)
+      : new THREE.PlaneGeometry(ROAD_WIDTH, length),
+    roadMat
+  );
+  road.rotation.x = -Math.PI / 2;
+  road.position.set(axis === 'x' ? 0 : fixed, 0.02, axis === 'x' ? fixed : 0);
+  road.receiveShadow = true;
+  scene.add(road);
+
+  const sideOffset = ROAD_WIDTH / 2 + SIDEWALK_WIDTH / 2;
+  for (const sign of [-1, 1]) {
+    const sidewalk = new THREE.Mesh(
+      axis === 'x'
+        ? new THREE.PlaneGeometry(length, SIDEWALK_WIDTH)
+        : new THREE.PlaneGeometry(SIDEWALK_WIDTH, length),
+      sidewalkMat
+    );
+    sidewalk.rotation.x = -Math.PI / 2;
+    sidewalk.position.set(
+      axis === 'x' ? 0 : fixed + sign * sideOffset,
+      0.026,
+      axis === 'x' ? fixed + sign * sideOffset : 0
+    );
+    sidewalk.receiveShadow = true;
+    scene.add(sidewalk);
+
+    const curb = new THREE.Mesh(
+      axis === 'x'
+        ? new THREE.BoxGeometry(length, CURB_H, 0.12)
+        : new THREE.BoxGeometry(0.12, CURB_H, length),
+      curbMat
+    );
+    curb.position.set(
+      axis === 'x' ? 0 : fixed + sign * (ROAD_WIDTH / 2),
+      CURB_H / 2,
+      axis === 'x' ? fixed + sign * (ROAD_WIDTH / 2) : 0
+    );
+    curb.receiveShadow = true;
+    scene.add(curb);
   }
 }
-addRoad(WORLD, 9, 0, -20);
-addRoad(WORLD, 9, 0, 20);
-addRoad(9, WORLD, -25, 0);
-addRoad(9, WORLD, 25, 0);
-addDashes('x', -20);
-addDashes('x', 20);
-addDashes('z', -25);
-addDashes('z', 25);
+
+function addStreetDashes(axis, fixed) {
+  const gap = 10;
+  const dashLength = 4;
+  for (let v = -46; v <= 46; v += gap) {
+    // Keep junction centers visually open.
+    if ([-25, 25].some((junction) => Math.abs(v - junction) < 7)) continue;
+
+    const dash = new THREE.Mesh(
+      axis === 'x' ? new THREE.PlaneGeometry(dashLength, 0.22) : new THREE.PlaneGeometry(0.22, dashLength),
+      dashMat
+    );
+    dash.rotation.x = -Math.PI / 2;
+    dash.position.set(axis === 'x' ? v : fixed, 0.035, axis === 'x' ? fixed : v);
+    scene.add(dash);
+  }
+}
+
+function addCrosswalk(x, z, horizontal = true) {
+  for (let i = -2; i <= 2; i++) {
+    const stripe = new THREE.Mesh(
+      horizontal
+        ? new THREE.PlaneGeometry(0.45, ROAD_WIDTH - 1)
+        : new THREE.PlaneGeometry(ROAD_WIDTH - 1, 0.45),
+      crosswalkMat
+    );
+    stripe.rotation.x = -Math.PI / 2;
+    stripe.position.set(
+      horizontal ? x + i * 1.05 : x,
+      0.037,
+      horizontal ? z : z + i * 1.05
+    );
+    scene.add(stripe);
+  }
+}
+
+addStreetStrip('x', -20);
+addStreetStrip('x', 20);
+addStreetStrip('z', -25);
+addStreetStrip('z', 25);
+
+addStreetDashes('x', -20);
+addStreetDashes('x', 20);
+addStreetDashes('z', -25);
+addStreetDashes('z', 25);
+
+for (const x of [-25, 25]) {
+  for (const z of [-20, 20]) {
+    addCrosswalk(x, z, true);
+    addCrosswalk(x, z, false);
+  }
+}
 
 const colliders = [];
 const mat = (color) => new THREE.MeshLambertMaterial({ color });
@@ -136,18 +218,49 @@ const mat = (color) => new THREE.MeshLambertMaterial({ color });
 for (const [x, z, w, h, d, color] of BUILDINGS) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    mat(color)
+  );
   body.position.y = h / 2;
   body.castShadow = body.receiveShadow = true;
   g.add(body);
-  const windows = new THREE.MeshBasicMaterial({ color: 0xccc38a });
-  for (let y = 2.0; y < h - 0.7; y += 2.7) {
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(w + 0.05, 0.16, d + 0.05), windows);
-    strip.position.y = y;
-    g.add(strip);
+
+  // Very light low-poly roof cap: readable silhouette without detailed assets.
+  const roof = new THREE.Mesh(
+    new THREE.BoxGeometry(w + 0.18, 0.18, d + 0.18),
+    mat(0x626666)
+  );
+  roof.position.y = h + 0.09;
+  roof.castShadow = true;
+  g.add(roof);
+
+  // Simple facade accents, not continuous window bands.
+  const frontWindowMat = new THREE.MeshBasicMaterial({ color: 0xd1c88f });
+  const windowCount = Math.max(1, Math.min(3, Math.floor(w / 4)));
+  const windowSpacing = w / (windowCount + 1);
+  for (let i = 1; i <= windowCount; i++) {
+    const window = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9, Math.min(1.2, Math.max(0.8, h * 0.18)), 0.05),
+      frontWindowMat
+    );
+    window.position.set(
+      -w / 2 + windowSpacing * i,
+      Math.min(h * 0.62, 3.0),
+      d / 2 + 0.028
+    );
+    g.add(window);
   }
+
   scene.add(g);
-  colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
+
+  colliders.push({
+    minX: x - w / 2,
+    maxX: x + w / 2,
+    minZ: z - d / 2,
+    maxZ: z + d / 2,
+  });
 }
 
 const baseCenter = new THREE.Vector3(0, 0, -39);
@@ -178,15 +291,23 @@ const baseMarker = new THREE.Mesh(
 baseMarker.position.set(baseCenter.x, 0.08, baseCenter.z);
 scene.add(baseMarker);
 
+const edgeMat = mat(0x55595a);
 for (const [w, d, x, z] of [
-  [WORLD, 1, 0, -HALF], [WORLD, 1, 0, HALF],
-  [1, WORLD, -HALF, 0], [1, WORLD, HALF, 0],
+  [WORLD, 0.6, 0, -HALF + 0.3],
+  [WORLD, 0.6, 0, HALF - 0.3],
+  [0.6, WORLD, -HALF + 0.3, 0],
+  [0.6, WORLD, HALF - 0.3, 0],
 ]) {
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(w, 3, d), mat(0x2d3530));
-  wall.position.set(x, 1.5, z);
-  wall.castShadow = wall.receiveShadow = true;
-  scene.add(wall);
-  colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(w, 0.55, d), edgeMat);
+  edge.position.set(x, 0.275, z);
+  edge.castShadow = edge.receiveShadow = true;
+  scene.add(edge);
+  colliders.push({
+    minX: x - w / 2,
+    maxX: x + w / 2,
+    minZ: z - d / 2,
+    maxZ: z + d / 2
+  });
 }
 
 // Player — animated rigged GLB
