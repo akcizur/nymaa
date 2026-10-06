@@ -5,16 +5,15 @@ import './style.css';
 const SAVE_KEY = 'nymaa-post-catastrophe-mvp-v1';
 const WORLD = 100;
 const HALF = WORLD / 2;
-const PLAYER_R = 0.38;
+const PLAYER_R = 0.42;
 const INTERACT_R = 3.0;
 const GAME_MINUTES_PER_SECOND = 2.5;
 const MAX_INVENTORY = 14;
-const PLAYER_HEIGHT = 1.78;
-const WALK_SPEED = 3.0;
-const RUN_SPEED = 5.6;
-const WALK_ANIM_SPEED = 3.0;
-const RUN_ANIM_SPEED = 5.6;
-const PLAYER_MODEL_YAW = Math.PI;
+const PLAYER_HEIGHT = 1.8;
+const WALK_SPEED = 4.2;
+const RUN_SPEED = 7.2;
+const WALK_ANIM_SPEED = 4.2;
+const RUN_ANIM_SPEED = 7.2;
 
 const ITEM = {
   water: { label: 'WATER', weight: 1 },
@@ -247,19 +246,11 @@ async function loadPlayerModel() {
         }
       });
 
-      // The game uses +Z as the canonical player-forward axis.
-      // This asset is authored facing the opposite local direction, so keep
-      // the correction on the visual model rather than corrupting gameplay yaw.
-      root.rotation.set(0, PLAYER_MODEL_YAW, 0);
-
       const bounds = new THREE.Box3().setFromObject(root);
       const size = bounds.getSize(new THREE.Vector3());
       if (size.y > 0.001) root.scale.setScalar(PLAYER_HEIGHT / size.y);
 
       const fittedBounds = new THREE.Box3().setFromObject(root);
-      const center = fittedBounds.getCenter(new THREE.Vector3());
-      root.position.x -= center.x;
-      root.position.z -= center.z;
       root.position.y -= fittedBounds.min.y;
 
       player.add(root);
@@ -835,11 +826,13 @@ function clampWorld() {
 
 function updatePlayer(dt) {
   const input = getInput();
+
   if (!input.mag) {
     playPlayerAnimation('Idle');
     return;
   }
 
+  // Camera-relative world direction.
   const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
   const rx = -fz, rz = fx;
   const wx = input.z * fx + input.x * rx;
@@ -854,11 +847,13 @@ function updatePlayer(dt) {
   pushOut(player.position, PLAYER_R);
   clampWorld();
 
-  // Gameplay yaw is always the actual world travel direction.
-  // The model's visual yaw correction is isolated inside the GLB root.
-  const target = Math.atan2(wx, wz);
-  const delta = Math.atan2(Math.sin(target - player.rotation.y), Math.cos(target - player.rotation.y));
-  player.rotation.y += delta * (1 - Math.exp(-15 * dt));
+  // Character forward = actual travel direction. No extra model rotation.
+  const targetYaw = Math.atan2(wx, wz);
+  const delta = Math.atan2(
+    Math.sin(targetYaw - player.rotation.y),
+    Math.cos(targetYaw - player.rotation.y)
+  );
+  player.rotation.y += delta * (1 - Math.exp(-16 * dt));
 
   playPlayerAnimation(running ? 'Run' : 'Walk', speed);
 }
@@ -890,27 +885,31 @@ function updateLighting() {
 }
 
 function updateCamera(dt, snap = false) {
-  const input = getInput();
-  if (input.mag) {
-    const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
-    const rx = -fz, rz = fx;
-    const wx = input.z * fx + input.x * rx;
-    const wz = input.z * fz + input.x * rz;
-    const desiredYaw = Math.atan2(wx, wz);
-    let d = Math.atan2(Math.sin(desiredYaw - camYaw), Math.cos(desiredYaw - camYaw));
-    camYaw += d * (snap ? 1 : 1 - Math.exp(-3.8 * dt));
-  }
+  // Camera heading follows the character, not raw input.
+  // This prevents D/A from continuously rotating the camera underneath the player.
+  const desiredYaw = player.rotation.y;
+  let d = Math.atan2(Math.sin(desiredYaw - camYaw), Math.cos(desiredYaw - camYaw));
+  camYaw += d * (snap ? 1 : 1 - Math.exp(-5.2 * dt));
+
   const k = snap ? 1 : 1 - Math.exp(-7 * dt);
-  focus.x += (player.position.x - focus.x) * k;
-  focus.z += (player.position.z - focus.z) * k;
-  const dist = 13, height = 19;
+  const lookAhead = 1.8;
+  const aheadX = Math.sin(player.rotation.y) * lookAhead;
+  const aheadZ = Math.cos(player.rotation.y) * lookAhead;
+
+  focus.x += (player.position.x + aheadX - focus.x) * k;
+  focus.z += (player.position.z + aheadZ - focus.z) * k;
+
+  const dist = 12.5;
+  const height = 18.5;
   const desired = new THREE.Vector3(
     focus.x - Math.sin(camYaw) * dist,
     height,
     focus.z - Math.cos(camYaw) * dist
   );
-  camera.position.lerp(desired, snap ? 1 : 1 - Math.exp(-6 * dt));
-  camera.lookAt(focus.x, 1, focus.z);
+
+  camera.position.lerp(desired, snap ? 1 : 1 - Math.exp(-7 * dt));
+  if (camera.position.y < 6) camera.position.y = 6;
+  camera.lookAt(focus.x, 0.9, focus.z);
 }
 
 function closePanelsWhenFar() {
@@ -932,8 +931,8 @@ function loop() {
   const dt = Math.min(clock.getDelta(), 0.05);
 
   if (actionQueued) { actionQueued = false; action(); }
-  updatePlayer(dt);
   updateSurvival(dt);
+  updatePlayer(dt);
   updateLighting();
   if (playerMixer) playerMixer.update(dt);
   updateCamera(dt);
