@@ -4,9 +4,11 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/BoxComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 ANymaaCarPawn::ANymaaCarPawn()
 {
@@ -29,10 +31,8 @@ ANymaaCarPawn::ANymaaCarPawn()
     Cabin->SetRelativeScale3D(FVector(0.85f, 0.85f, 0.55f));
     Cabin->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    WheelsRoot = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WheelsRoot"));
+    WheelsRoot = CreateDefaultSubobject<USceneComponent>(TEXT("WheelsRoot"));
     WheelsRoot->SetupAttachment(Collision);
-    WheelsRoot->SetStaticMesh(nullptr);
-    WheelsRoot->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
     if (CubeMesh.Succeeded())
@@ -45,7 +45,7 @@ ANymaaCarPawn::ANymaaCarPawn()
 
     if (CylinderMesh.Succeeded())
     {
-        const FVector WheelScale(0.42f, 0.16f, 0.42f);
+        const FVector WheelScale(0.85f, 0.32f, 0.85f);
         const FName Names[] = { TEXT("WheelFL"), TEXT("WheelFR"), TEXT("WheelRL"), TEXT("WheelRR") };
         const FVector Positions[] =
         {
@@ -58,13 +58,31 @@ ANymaaCarPawn::ANymaaCarPawn()
         for (int32 i = 0; i < 4; ++i)
         {
             UStaticMeshComponent* Wheel = NewObject<UStaticMeshComponent>(this, Names[i]);
-            Wheel->SetupAttachment(Collision);
+            Wheel->SetupAttachment(WheelsRoot);
             Wheel->RegisterComponent();
             Wheel->SetStaticMesh(CylinderMesh.Object);
             Wheel->SetRelativeLocation(Positions[i]);
             Wheel->SetRelativeRotation(FRotator(90, 0, 0));
             Wheel->SetRelativeScale3D(WheelScale);
             Wheel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            Wheels.Add(Wheel);
+        }
+    }
+
+    if (UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
+        nullptr,
+        TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+    {
+        if (UMaterialInstanceDynamic* BodyMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this))
+        {
+            BodyMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.72f, 0.08f, 0.10f, 1.0f));
+            Body->SetMaterial(0, BodyMaterial);
+        }
+
+        if (UMaterialInstanceDynamic* CabinMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this))
+        {
+            CabinMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.05f, 0.07f, 0.09f, 1.0f));
+            Cabin->SetMaterial(0, CabinMaterial);
         }
     }
 
