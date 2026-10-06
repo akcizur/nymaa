@@ -16,10 +16,12 @@ concurrency:
 
 env:
   GODOT_VERSION: 4.6.3
+  PROJECT_PATH: .
+  EXPORT_NAME: nymaa
 
 jobs:
   build:
-    name: Godot Web Build
+    name: Build Web
     runs-on: ubuntu-24.04
     container:
       image: barichello/godot-ci:4.6.3
@@ -30,25 +32,34 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup Godot export templates
+      - name: Setup Godot
         run: |
-          mkdir -p ~/.local/share/godot/export_templates
-          mkdir -p ~/.config
-          rm -rf ~/.config/godot
+          mkdir -v -p ~/.local/share/godot/export_templates/
+          mkdir -v -p ~/.config/
           mv /root/.config/godot ~/.config/godot
-          rm -rf ~/.local/share/godot/export_templates/\${GODOT_VERSION}.stable
           mv /root/.local/share/godot/export_templates/\${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/\${GODOT_VERSION}.stable
+
+      - name: Validate GDScript
+        shell: bash
+        run: |
+          set -e
+          for script in scripts/*.gd; do
+            echo "Checking \$script"
+            godot --headless --path "\${PROJECT_PATH}" --check-only --script "res://\${script#./}"
+          done
 
       - name: Validate project
         run: |
-          godot --headless --editor --quit --path . --verbose
+          godot --headless --editor --quit --path "\${PROJECT_PATH}"
 
       - name: Export Web
         run: |
-          mkdir -p build/web
-          godot --headless --verbose --path . --export-release "Web" build/web/index.html
+          mkdir -v -p build/web
+          EXPORT_DIR="\$(readlink -f build)"
+          cd "\${PROJECT_PATH}"
+          godot --headless --verbose --export-release "Web" "\${EXPORT_DIR}/web/index.html"
 
-      - name: Configure GitHub Pages
+      - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
@@ -58,8 +69,8 @@ jobs:
 
   deploy:
     name: Deploy to GitHub Pages
-    runs-on: ubuntu-24.04
     needs: build
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: \${{ steps.deployment.outputs.page_url }}
