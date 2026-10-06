@@ -7,6 +7,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 ANymaaPlayerPawn::ANymaaPlayerPawn()
 {
@@ -51,6 +52,29 @@ ANymaaPlayerPawn::ANymaaPlayerPawn()
     if (CubeMesh.Succeeded())
     {
         Nose->SetStaticMesh(CubeMesh.Object);
+    }
+
+    if (UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(
+        nullptr,
+        TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+    {
+        if (UMaterialInstanceDynamic* BodyMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this))
+        {
+            BodyMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.18f, 0.48f, 0.78f, 1.0f));
+            Body->SetMaterial(0, BodyMaterial);
+        }
+
+        if (UMaterialInstanceDynamic* HeadMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this))
+        {
+            HeadMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.83f, 0.62f, 0.46f, 1.0f));
+            Head->SetMaterial(0, HeadMaterial);
+        }
+
+        if (UMaterialInstanceDynamic* NoseMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this))
+        {
+            NoseMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.03f, 0.05f, 0.07f, 1.0f));
+            Nose->SetMaterial(0, NoseMaterial);
+        }
     }
 
     CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
