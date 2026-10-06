@@ -6,6 +6,7 @@
 
 class UBoxComponent;
 class UStaticMeshComponent;
+class USceneComponent;
 class USpringArmComponent;
 class UCameraComponent;
 
@@ -32,7 +33,10 @@ private:
     UStaticMeshComponent* Cabin = nullptr;
 
     UPROPERTY(VisibleAnywhere)
-    UStaticMeshComponent* WheelsRoot = nullptr;
+    USceneComponent* WheelsRoot = nullptr;
+
+    UPROPERTY()
+    TArray<TObjectPtr<UStaticMeshComponent>> Wheels;
 
     UPROPERTY(VisibleAnywhere)
     USpringArmComponent* CameraBoom = nullptr;
