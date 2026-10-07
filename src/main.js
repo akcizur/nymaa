@@ -33,25 +33,26 @@ const RECIPES = [
   { id: 'tool', label: 'BASIC TOOL', kind: 'item', cost: { wood: 4, scrap: 5 }, item: 'tool', benefit: 'required for heavy scrap nodes' },
 ];
 
+const BUILDING_TYPES = {
+  small:  { w: 3.2, h: 2.4, d: 2.6 },
+  medium: { w: 4.8, h: 3.0, d: 3.6 },
+  large:  { w: 6.4, h: 3.6, d: 4.8 },
+};
+
+// World architecture intentionally stays primitive:
+// a small number of solid boxes, scaled from the 1.80 m player height.
 const BUILDINGS = [
-  [-3.6, -2.2, 2.8, 2.4, 2.6, 0x7d8585],
-  [3.0, -2.6, 2.8, 1.8, 2.3, 0x9a8b68],
-  [-3.4, 3.2, 2.6, 1.7, 2.4, 0x8b6f62],
-  [3.5, 3.1, 2.9, 2.4, 2.6, 0x7d8585],
+  { x: -15.0, z: -14.0, ...BUILDING_TYPES.small,  color: 0x8b6f62 },
+  { x:   3.2, z: -13.2, ...BUILDING_TYPES.medium, color: 0x9a8b68 },
+  { x:  14.5, z: -14.0, ...BUILDING_TYPES.large,  color: 0x7d8585 },
 
-  [-15.0, -14.0, 2.2, 1.8, 2.2, 0x8b6f62],
-  [14.5, -14.0, 2.8, 2.2, 2.2, 0x9a8b68],
-  [-14.8, 14.3, 2.5, 3.2, 2.4, 0x7d8585],
-  [-3.2, 14.0, 3.2, 4.0, 3.0, 0x707878],
-  [3.5, 14.0, 2.8, 2.1, 2.3, 0x9a8b68],
-  [14.5, 14.2, 2.3, 1.8, 2.2, 0x8b6f62],
+  { x: -15.0, z:   0.0, ...BUILDING_TYPES.small,  color: 0x796b5f },
+  { x:  14.8, z:   0.0, ...BUILDING_TYPES.large,  color: 0x707878 },
 
-  [-14.5, 0, 2.3, 1.8, 2.2, 0x8b6f62],
-  [14.8, 0, 2.8, 3.5, 2.6, 0x7d8585],
-  [-13.7, -1.6, 2.0, 1.6, 2.0, 0x796b5f],
-  [13.5, 4.0, 2.0, 1.6, 2.0, 0x796b5f],
+  { x: -14.0, z:  14.0, ...BUILDING_TYPES.medium, color: 0x7d8585 },
+  { x:  -3.0, z:  14.0, ...BUILDING_TYPES.large,  color: 0x707878 },
+  { x:   5.0, z:  14.0, ...BUILDING_TYPES.medium, color: 0x9a8b68 },
 ];
-
 const LOOT_SEEDS = [
   { id: 'crate-a', x: -12, z: -12, label: 'ABANDONED CACHE', items: { water: 2, food: 1, scrap: 2 } },
   { id: 'crate-b', x: -12, z: -5.5, label: 'KITCHEN', items: { food: 2, medicine: 1, dirtyWater: 2 } },
@@ -215,45 +216,17 @@ for (const x of [-10, 10]) {
 const colliders = [];
 const mat = (color) => new THREE.MeshLambertMaterial({ color });
 
-for (const [x, z, w, h, d, color] of BUILDINGS) {
-  const g = new THREE.Group();
-  g.position.set(x, 0, z);
-
+for (const building of BUILDINGS) {
+  const { x, z, w, h, d, color } = building;
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(w, h, d),
     mat(color)
   );
-  body.position.y = h / 2;
-  body.castShadow = body.receiveShadow = true;
-  g.add(body);
 
-  // Very light low-poly roof cap: readable silhouette without detailed assets.
-  const roof = new THREE.Mesh(
-    new THREE.BoxGeometry(w + 0.18, 0.18, d + 0.18),
-    mat(0x626666)
-  );
-  roof.position.y = h + 0.09;
-  roof.castShadow = true;
-  g.add(roof);
-
-  // Simple facade accents, not continuous window bands.
-  const frontWindowMat = new THREE.MeshBasicMaterial({ color: 0xd1c88f });
-  const windowCount = Math.max(1, Math.min(3, Math.floor(w / 4)));
-  const windowSpacing = w / (windowCount + 1);
-  for (let i = 1; i <= windowCount; i++) {
-    const window = new THREE.Mesh(
-      new THREE.BoxGeometry(0.9, Math.min(1.2, Math.max(0.8, h * 0.18)), 0.05),
-      frontWindowMat
-    );
-    window.position.set(
-      -w / 2 + windowSpacing * i,
-      Math.min(h * 0.62, 3.0),
-      d / 2 + 0.028
-    );
-    g.add(window);
-  }
-
-  scene.add(g);
+  body.position.set(x, h / 2, z);
+  body.castShadow = true;
+  body.receiveShadow = true;
+  scene.add(body);
 
   colliders.push({
     minX: x - w / 2,
@@ -1078,182 +1051,3 @@ function getInput() {
 function isRunning() {
   return touchRun || keys.has('ShiftLeft') || keys.has('ShiftRight');
 }
-function pushOut(p, r) {
-  for (let pass = 0; pass < 2; pass++) {
-    let hit = false;
-    for (const c of colliders) {
-      const cx = Math.max(c.minX, Math.min(p.x, c.maxX));
-      const cz = Math.max(c.minZ, Math.min(p.z, c.maxZ));
-      const dx = p.x - cx, dz = p.z - cz, d2 = dx * dx + dz * dz;
-      if (d2 >= r * r) continue;
-      hit = true;
-      if (d2 > 1e-8) {
-        const d = Math.sqrt(d2), k = (r - d) / d;
-        p.x += dx * k; p.z += dz * k;
-      } else {
-        const dl = p.x - c.minX, dr = c.maxX - p.x, db = p.z - c.minZ, df = c.maxZ - p.z;
-        const m = Math.min(dl, dr, db, df);
-        if (m === dl) p.x = c.minX - r;
-        else if (m === dr) p.x = c.maxX + r;
-        else if (m === db) p.z = c.minZ - r;
-        else p.z = c.maxZ + r;
-      }
-    }
-    if (!hit) break;
-  }
-}
-function clampWorld() {
-  const m = PLAYER_R + 0.15;
-  player.position.x = THREE.MathUtils.clamp(player.position.x, -HALF + m, HALF - m);
-  player.position.z = THREE.MathUtils.clamp(player.position.z, -HALF + m, HALF - m);
-}
-
-function updatePlayer(dt) {
-  playerShadow.position.x = player.position.x;
-  playerShadow.position.z = player.position.z;
-
-  if (playerDeadUntil > performance.now()) {
-    playPlayerAnimation('Death');
-    return;
-  }
-
-  if (playerOneShot && performance.now() > playerOneShotUntil) {
-    playerOneShot = false;
-    playerOneShotAction = null;
-    playerOneShotUntil = 0;
-    playPlayerAnimation(playerLocomotion, 0);
-  }
-
-  const input = getInput();
-
-  if (!input.mag) {
-    playPlayerAnimation('Idle');
-    return;
-  }
-
-  // Camera-relative world direction in the map's normalized scale.
-  const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
-  const rx = -fz, rz = fx;
-  const wx = input.z * fx + input.x * rx;
-  const wz = input.z * fz + input.x * rz;
-
-  const survivalPenalty = Math.min(state.hunger, state.thirst) < 30 ? 0.82 : 1;
-  const running = isRunning();
-  const speed = (running ? RUN_SPEED : WALK_SPEED) * survivalPenalty;
-
-  player.position.x += wx * speed * dt;
-  player.position.z += wz * speed * dt;
-  pushOut(player.position, PLAYER_R);
-  clampWorld();
-
-  // Keep gameplay movement orientation on the default controller axis.
-  // The model's visual yaw offset is handled independently.
-  const targetYaw = Math.atan2(wx, wz) + (Math.PI / 2);
-  const delta = Math.atan2(
-    Math.sin(targetYaw - player.rotation.y),
-    Math.cos(targetYaw - player.rotation.y)
-  );
-  player.rotation.y += delta * (1 - Math.exp(-11 * dt));
-
-  playPlayerAnimation(running ? 'Run' : 'Walk', speed);
-}
-
-function updateSurvival(dt) {
-  state.hunger = Math.max(0, state.hunger - dt * 0.11);
-  state.thirst = Math.max(0, state.thirst - dt * 0.17);
-  if (state.hunger <= 8 || state.thirst <= 8) state.health = Math.max(0, state.health - dt * 0.42);
-  if (state.health <= 0) {
-    message('YOU COLLAPSED — respawn at base.', 3500);
-    playerDeadUntil = performance.now() + 1100;
-    playPlayerOneShot('Death', 1.0, 0.05);
-    player.position.set(0,0,-17);
-    state.health = 55;
-    state.hunger = 35;
-    state.thirst = 45;
-  }
-  state.time = (state.time + dt * GAME_MINUTES_PER_SECOND) % 1440;
-}
-
-function updateLighting() {
-  const t = state.time / 1440;
-  const sunAngle = t * Math.PI * 2 - Math.PI / 2;
-  const daylight = Math.max(0, Math.sin(sunAngle));
-  const night = 1 - daylight;
-  sun.position.set(Math.cos(t * Math.PI * 2) * 45, 25 + daylight * 50, Math.sin(t * Math.PI * 2) * 35);
-  sun.intensity = 0.35 + daylight * 2.0;
-  ambient.intensity = 0.52 + daylight * 1.0;
-  scene.fog.density = 0.008 + night * 0.009;
-  document.body.classList.toggle('night', night > 0.55);
-}
-
-function updateCamera(dt, snap = false) {
-  if (touchLook.x || touchLook.y) {
-    camYaw -= touchLook.x * 2.15 * dt;
-    camPitch = THREE.MathUtils.clamp(
-      camPitch + touchLook.y * 1.25 * dt,
-      0.62,
-      1.16
-    );
-  }
-
-  const k = snap ? 1 : 1 - Math.exp(-8 * dt);
-  focus.x += (player.position.x - focus.x) * k;
-  focus.z += (player.position.z - focus.z) * k;
-
-  const dist = 13.0;
-  const horizontal = Math.cos(camPitch) * dist;
-  const height = Math.sin(camPitch) * dist;
-  const desired = new THREE.Vector3(
-    focus.x - Math.sin(camYaw) * horizontal,
-    0.8 + height,
-    focus.z - Math.cos(camYaw) * horizontal
-  );
-
-  camera.position.lerp(desired, snap ? 1 : 1 - Math.exp(-8 * dt));
-  camera.lookAt(focus.x, 0.8, focus.z);
-}
-
-function closePanelsWhenFar() {
-  if (document.getElementById('base').classList.contains('hidden')) return;
-  if (!nearBase()) document.getElementById('base').classList.add('hidden');
-}
-
-// Init controls
-document.getElementById('load').remove();
-loadGame(false);
-renderUI();
-updateLighting();
-updateObjective();
-updateCamera(0, true);
-
-let lastSave = 0;
-function loop() {
-  requestAnimationFrame(loop);
-  const dt = Math.min(clock.getDelta(), 0.05);
-
-  if (actionQueued) { actionQueued = false; action(); }
-  updateSurvival(dt);
-  updatePlayer(dt);
-  updateLighting();
-  if (playerMixer) playerMixer.update(dt);
-  updateCamera(dt);
-  updateHint();
-  closePanelsWhenFar();
-
-  lastSave += dt;
-  if (lastSave > 20) { lastSave = 0; saveGame(false); }
-
-  flashClock += dt;
-  if (flashClock > 0.15) {
-    flashClock = 0;
-    renderUI();
-  }
-  renderer.render(scene, camera);
-}
-loop();
-
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
