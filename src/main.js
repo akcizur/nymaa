@@ -309,7 +309,8 @@ playerShadow.rotation.x = -Math.PI / 2;
 playerShadow.position.y = 0.008;
 scene.add(playerShadow);
 
-const PLAYER_MODEL_URL = new URL('../assets/player/demo-avatar.glb', import.meta.url).href;
+const PLAYER_MODEL_URL = new URL('../assets/player/xy-blue-metal-manequin.glb', import.meta.url).href;
+const PLAYER_MODEL_FALLBACK_URL = new URL('../assets/player/demo-avatar.glb', import.meta.url).href;
 
 function playPlayerAnimation(name, movementSpeed = 0, fade = 0.14) {
   if (!playerMixer || !playerActions.size) return;
@@ -367,111 +368,131 @@ function playPlayerOneShot(name, timeScale = 1, fade = 0.10) {
   return true;
 }
 
+async function fetchPlayerBuffer(url) {
+  const response = await fetch(url, {
+    cache: 'no-store',
+    credentials: 'same-origin',
+  });
+
+  if (!response.ok) {
+    throw new Error(`PLAYER MODEL HTTP ${response.status}: ${url}`);
+  }
+
+  const total = Number(response.headers.get('content-length')) || 0;
+  const reader = response.body?.getReader();
+
+  if (!reader) return new Uint8Array(await response.arrayBuffer());
+
+  let loaded = 0;
+  const chunks = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    chunks.push(value);
+    loaded += value.byteLength;
+
+    if (total) {
+      console.debug('PLAYER MODEL progress', {
+        loaded,
+        total,
+        ratio: loaded / total,
+      });
+    }
+  }
+
+  const buffer = new Uint8Array(loaded);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return buffer;
+}
+
 async function loadPlayerModel() {
-  const loader = new GLTFLoader();
+  let sourceUrl = PLAYER_MODEL_URL;
+  let buffer;
 
   try {
-    // Resolve from the built module URL so the model always stays inside
-    // the GitHub Pages /nymaa/ origin. Do not let GLTFLoader construct a
-    // file:/// or root-relative resource path.
-    const response = await fetch(PLAYER_MODEL_URL, {
-      cache: 'no-store',
-      credentials: 'same-origin',
-    });
+    buffer = await fetchPlayerBuffer(PLAYER_MODEL_URL);
+  } catch (primaryError) {
+    console.warn('PLAYER MODEL primary asset unavailable, using fallback.', primaryError);
+    sourceUrl = PLAYER_MODEL_FALLBACK_URL;
+    buffer = await fetchPlayerBuffer(PLAYER_MODEL_FALLBACK_URL);
+  }
 
-    if (!response.ok) {
-      throw new Error(`PLAYER MODEL HTTP ${response.status}: ${PLAYER_MODEL_URL}`);
-    }
+  const loader = new GLTFLoader();
 
-    const total = Number(response.headers.get('content-length')) || 0;
-    let loaded = 0;
-    const reader = response.body?.getReader();
+  await new Promise((resolve, reject) => {
+    loader.parse(
+      buffer.buffer,
+      new URL('./', sourceUrl).href,
+      (gltf) => {
+        const root = gltf.scene;
+        root.rotation.y = 0;
 
-    let buffer;
-    if (reader) {
-      const chunks = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        loaded += value.byteLength;
-        if (total) {
-          console.debug('PLAYER MODEL progress', {
-            loaded,
-            total,
-            ratio: loaded / total,
-          });
+        root.traverse((object) => {
+          if (!object.isMesh) return;
+
+          object.castShadow = true;
+          object.receiveShadow = true;
+
+          if (!object.material) return;
+
+          const materials = Array.isArray(object.material)
+            ? object.material
+            : [object.material];
+
+          for (const material of materials) {
+            material.metalness = Math.min(material.metalness ?? 0, 0.15);
+            material.roughness = Math.max(material.roughness ?? 0.55, 0.55);
+          }
+        });
+
+        const bounds = new THREE.Box3().setFromObject(root);
+        const size = bounds.getSize(new THREE.Vector3());
+
+        if (size.y > 0.001) {
+          root.scale.setScalar(PLAYER_HEIGHT / size.y);
         }
-      }
 
-      buffer = new Uint8Array(loaded);
-      let offset = 0;
-      for (const chunk of chunks) {
-        buffer.set(chunk, offset);
-        offset += chunk.byteLength;
-      }
-    } else {
-      buffer = new Uint8Array(await response.arrayBuffer());
-    }
+        const fittedBounds = new THREE.Box3().setFromObject(root);
+        root.position.y -= fittedBounds.min.y;
 
-    await new Promise((resolve, reject) => {
-      loader.parse(
-        buffer.buffer,
-        new URL('./', PLAYER_MODEL_URL).href,
-        (gltf) => {
-          const root = gltf.scene;
+        player.add(root);
+        playerModel = root;
 
-          // Visual correction: rotate the character 90° left around Y.
-          root.rotation.y = 0;
+        playerMixer = new THREE.AnimationMixer(root);
+        playerActions = new Map(
+          gltf.animations.map((clip) => [clip.name, playerMixer.clipAction(clip)])
+        );
 
-          root.traverse((object) => {
-            if (object.isMesh) {
-              object.castShadow = true;
-              object.receiveShadow = true;
-              if (object.material) {
-                const materials = Array.isArray(object.material) ? object.material : [object.material];
-                for (const material of materials) {
-                  material.metalness = Math.min(material.metalness ?? 0, 0.15);
-                  material.roughness = Math.max(material.roughness ?? 0.55, 0.55);
-                }
-              }
-            }
-          });
-
-          const bounds = new THREE.Box3().setFromObject(root);
-          const size = bounds.getSize(new THREE.Vector3());
-          if (size.y > 0.001) root.scale.setScalar(PLAYER_HEIGHT / size.y);
-
-          const fittedBounds = new THREE.Box3().setFromObject(root);
-          root.position.y -= fittedBounds.min.y;
-
-          player.add(root);
-          playerModel = root;
-
-          playerMixer = new THREE.AnimationMixer(root);
-          playerActions = new Map(
-            gltf.animations.map((clip) => [clip.name, playerMixer.clipAction(clip)])
-          );
+        if (playerActions.size) {
           playerMixer.addEventListener('finished', (event) => {
             if (event.action !== playerOneShotAction) return;
+
             playerOneShot = false;
             playerOneShotAction = null;
             playerOneShotUntil = 0;
+
             playPlayerAnimation(playerLocomotion, 0);
           });
+        } else {
+          console.info('PLAYER MODEL: static rig, no embedded animations');
+        }
 
-          playPlayerAnimation('Idle', 0);
-          playerLoaded = true;
-          document.getElementById('load')?.remove();
-          resolve();
-        },
-        reject
-      );
-    });
-  } catch (error) {
-    console.error('PLAYER MODEL', error);
-    throw error;
-  }
+        playPlayerAnimation('Idle', 0);
+        playerLoaded = true;
+        document.getElementById('load')?.remove();
+        resolve();
+      },
+      reject
+    );
+  });
 }
 
 loadPlayerModel().catch((error) => {
